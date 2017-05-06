@@ -68,18 +68,10 @@ namespace hpx { namespace util
         }
     }
 
-    template <typename F, typename Tuple>
-    HPX_HOST_DEVICE HPX_FORCEINLINE
-    typename detail::fused_result_of<F&&(Tuple&&)>::type
-    invoke_fused(F&& f, Tuple&& t)
-    {
-        typedef typename detail::fused_result_of<F&&(Tuple&&)>::type R;
-
-        return detail::invoke_fused_impl<R>(
-            std::forward<F>(f), std::forward<Tuple>(t),
-            typename detail::fused_index_pack<Tuple>::type());
-    }
-
+    /// \copydoc invoke_fused
+    ///
+    /// \tparam R The result type of the function when it's called
+    ///           with the content of the given sequenced type.
     template <typename R, typename F, typename Tuple>
     HPX_HOST_DEVICE HPX_FORCEINLINE
     R invoke_fused_r(F&& f, Tuple&& t)
@@ -88,6 +80,24 @@ namespace hpx { namespace util
             std::forward<F>(f), std::forward<Tuple>(t),
             typename detail::fused_index_pack<Tuple>::type());
     }
+
+    /// Invokes the given functional type f with the content of
+    /// the sequenced type t (tuples, pairs)
+    ///
+    /// \returns The result of the function when it's called with
+    ///          the content of the given sequenced type.
+    ///
+    /// \note This is function is similar to `std::apply` (C++17)
+    template <typename F, typename Tuple>
+    HPX_HOST_DEVICE HPX_FORCEINLINE
+    typename detail::fused_result_of<F&&(Tuple&&)>::type
+    invoke_fused(F&& f, Tuple&& t)
+    {
+        typedef typename detail::fused_result_of<F&&(Tuple&&)>::type R;
+
+        return invoke_fused_r<R>(std::forward<F>(f), std::forward<Tuple>(t));
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     namespace functional
     {
