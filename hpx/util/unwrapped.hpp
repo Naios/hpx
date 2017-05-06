@@ -37,6 +37,8 @@ namespace hpx { namespace util
         struct unwrap_impl;
 
         ///////////////////////////////////////////////////////////////////////
+        /// Implements first level future unwrapping for
+        /// - `hpx::lcos::(shared_)?future<T>`
         template <typename T>
         struct unwrap_impl<
             T,
@@ -60,6 +62,15 @@ namespace hpx { namespace util
                 future.get();
             }
 
+            //// Probably simplify able into:
+            //template <typename Future>
+            //static auto call(Future&& future)
+            //    -> decltype(future.get())
+            //{
+            //    return future.get();
+            //}
+            //// Because `return void()` is a valid expression.
+
             template <typename Future>
             static type call(Future&& future)
             {
@@ -82,6 +93,7 @@ namespace hpx { namespace util
         };
 #endif
 
+        // Ranges (begin() and end()) of futures
         template <typename T>
         struct unwrap_impl<
             T,
@@ -111,6 +123,7 @@ namespace hpx { namespace util
                 return result;
             }
 
+            // Edge case for void futures
             template <typename Range>
             static type call(Range& range, /*is_void=*/std::true_type)
             {
@@ -120,6 +133,7 @@ namespace hpx { namespace util
                 }
             }
 
+            // Tag dispatch trampoline
             template <typename Range>
             static type call(Range&& range)
             {
@@ -424,7 +438,9 @@ namespace hpx { namespace util
         template <typename Pack, typename Enable = void>
         struct unwrap_dispatch;
 
-        /// future<T>
+        /// - hpx::lcos::(shared_)?future<T>
+        /// - Range (begin(), end()) of futures
+        /// - hpx::util::tuple<future<T>...>
         template <typename T>
         struct unwrap_dispatch<util::detail::pack<T>,
             typename std::enable_if<
@@ -460,11 +476,14 @@ namespace hpx { namespace util
             static unwrapped_impl<typename decay<F>::type>
             call(F && f)
             {
+                // We know that f is a functional object here already...
+                // Use a specific implementation for this
                 typedef unwrapped_impl<typename decay<F>::type> impl_type;
                 return impl_type(std::forward<F>(f));
             }
         };
 
+        /// Unwraps a variadic pack containing futures
         template <typename ... Ts>
         struct unwrap_dispatch<util::detail::pack<Ts...>,
             typename std::enable_if<
