@@ -331,8 +331,7 @@ namespace hpx { namespace util
             typename util::result_of<Delayed()>::type
             operator()()
             {
-                return util::invoke_fused(f_,
-                    util::make_tuple());
+                return f_();
             }
 
             // future
@@ -425,6 +424,7 @@ namespace hpx { namespace util
         template <typename Pack, typename Enable = void>
         struct unwrap_dispatch;
 
+        /// future<T>
         template <typename T>
         struct unwrap_dispatch<util::detail::pack<T>,
             typename std::enable_if<
@@ -444,6 +444,8 @@ namespace hpx { namespace util
             }
         };
 
+        /// Delayed function unwrapping
+        /// (returns a functional object which unwraps)
         template <typename T>
         struct unwrap_dispatch<util::detail::pack<T>,
             typename std::enable_if<
@@ -522,6 +524,7 @@ namespace hpx { namespace util
         return unwrapped(unwrapped(std::forward<Future>(f)));
     }
 
+    /// Unwrapped with nesting level 2 support
     template <typename F>
     typename std::enable_if<
         !traits::is_future<typename decay<F>::type>::value
