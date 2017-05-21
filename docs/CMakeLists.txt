@@ -381,20 +381,43 @@ endif()
 
 # Create links to properly view the docs in the build directory
 set(DOCS_OUTPUT_DIR "${CMAKE_BINARY_DIR}/share/hpx-${HPX_VERSION}/docs/html")
+
+# Creates a symbolic link from the destination to the target if the link doesn't exist yet.
+# Since `create_symlink` is only available for unix derivates,
+# we work around that in this macro.
+macro(do_symbolic_link SYM_TARGET SYM_DESTINATION)
+  if(WIN32)
+    message("win way ${SYM_TARGET} -> ${SYM_DESTINATION}")
+    # execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink ${TARGTE} ${SYM_DESTINATION})
+    # execute_process(COMMAND "${CMD_TARGET} /c mklink /J ${SYM_DESTINATION} ${TARGTE}" ERROR_VARIABLE err_var OUTPUT_VARIABLE out_var RESULT_VARIABLE res_var)
+
+    # execute_process(COMMAND cmd //C "mklink /J ${SYM_DESTINATION} ${SYM_TARGET}" ERROR_VARIABLE err_var OUTPUT_VARIABLE out_var RESULT_VARIABLE res_var)
+    # execute_process(COMMAND cmd //C help ERROR_VARIABLE err_var OUTPUT_VARIABLE out_var RESULT_VARIABLE res_var)
+
+    # mklink /J "E:/Projektmappen/hpx/share/hpx-1.1.0/docs/html/code/src" "C:/Source/hpx/src"
+    # execute_process(COMMAND cmd /c mklink "E:\\Projektmappen\\hpx\\share\\hpx-1.1.0\\docs\\html\\code\\src" "C:\\Source\\hpx\\src")
+    execute_process(COMMAND cmd /C "${CMAKE_CURRENT_LIST_DIR}/create_symbolic_link.bat" "${SYM_DESTINATION}" "${SYM_TARGET}")
+
+    # execute_process(COMMAND cmd /c mklink ${SYM_DESTINATION} ${SYM_TARGET})
+
+    # message("${CMAKE_CURRENT_LIST_DIR}/create_symbolic_link.bat")
+    message("result: ${res_var}, out: ${out_var}, error: ${err_var}")
+
+    # message("cmd /c mklink /J ${SYM_DESTINATION} ${SYM_TARGET}")
+  else()
+    # Only available on unix derivates
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink ${SYM_TARGET} ${SYM_DESTINATION})
+  endif()
+endmacro(do_symbolic_link)
+
 execute_process(COMMAND "${CMAKE_COMMAND}" -E make_directory "${DOCS_OUTPUT_DIR}" )
 execute_process(COMMAND "${CMAKE_COMMAND}" -E make_directory "${DOCS_OUTPUT_DIR}/code" )
-execute_process(
-  COMMAND "${CMAKE_COMMAND}" -E create_symlink "${PROJECT_SOURCE_DIR}/docs/html/src" "${DOCS_OUTPUT_DIR}/src")
-execute_process(
-  COMMAND "${CMAKE_COMMAND}" -E create_symlink "${PROJECT_SOURCE_DIR}/docs/html/images" "${DOCS_OUTPUT_DIR}/images")
-execute_process(
-  COMMAND "${CMAKE_COMMAND}" -E create_symlink "${PROJECT_SOURCE_DIR}/hpx" "${DOCS_OUTPUT_DIR}/code/hpx")
-execute_process(
-  COMMAND "${CMAKE_COMMAND}" -E create_symlink "${PROJECT_SOURCE_DIR}/src" "${DOCS_OUTPUT_DIR}/code/src")
-execute_process(
-  COMMAND "${CMAKE_COMMAND}" -E create_symlink "${PROJECT_SOURCE_DIR}/examples" "${DOCS_OUTPUT_DIR}/code/examples")
-execute_process(
-  COMMAND "${CMAKE_COMMAND}" -E create_symlink "${PROJECT_SOURCE_DIR}/tests" "${DOCS_OUTPUT_DIR}/code/tests")
+do_symbolic_link("${PROJECT_SOURCE_DIR}/docs/html/src" "${DOCS_OUTPUT_DIR}/src")
+do_symbolic_link("${PROJECT_SOURCE_DIR}/docs/html/images" "${DOCS_OUTPUT_DIR}/images")
+do_symbolic_link("${PROJECT_SOURCE_DIR}/hpx" "${DOCS_OUTPUT_DIR}/code/hpx")
+do_symbolic_link("${PROJECT_SOURCE_DIR}/src" "${DOCS_OUTPUT_DIR}/code/src")
+do_symbolic_link("${PROJECT_SOURCE_DIR}/examples" "${DOCS_OUTPUT_DIR}/code/examples")
+do_symbolic_link("${PROJECT_SOURCE_DIR}/tests" "${DOCS_OUTPUT_DIR}/code/tests")
 
 source_group(Documentation FILES ${base_files})
 source_group("Documentation\\Manual" FILES ${manual_files})
