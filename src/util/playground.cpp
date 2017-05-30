@@ -9,6 +9,10 @@
 
 // Testing
 #include <string>
+#include <hpx/lcos/future.hpp>
+#include <hpx/lcos/when_all.hpp>
+#include <hpx/lcos/dataflow.hpp>
+#include <hpx/util/unwrapped.hpp>
 
 namespace hpx { namespace util {
     namespace detail {
@@ -132,4 +136,28 @@ void testNewUnwrapped()
         // ...
         return content.size();
     }, http_request("github.com"));
+}
+
+void thenVsDataflow()
+{
+    hpx::future<int> f1, f2, f3; // Dummy vector
+
+    hpx::future<std::size_t> res1 = hpx::when_all(f1, f2, f3).then(
+        [](hpx::future<hpx::util::tuple<hpx::future<int>>> v) {
+            //
+            return 0;
+        });
+
+    hpx::future<std::size_t> res2 = hpx::dataflow(
+        [](hpx::future<hpx::util::tuple<hpx::future<int>>> v) {
+            //
+            return v.get().size();
+        },
+        f1, f2, f3);
+
+    hpx::make_ready_future(0)
+        .then([](hpx::future<int> i) { return 0; })
+        .then([](auto i) {
+
+        });
 }
