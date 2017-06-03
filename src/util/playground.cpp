@@ -97,6 +97,12 @@ struct future
 };
 
 template <typename T>
+future<typename std::decay<T>::type> make_ready_future(T&&)
+{
+    return {};
+}
+
+template <typename T>
 T unwrap(T t)
 {
     return t;
@@ -119,7 +125,69 @@ future<std::string> http_request(std::string /*url*/)
 {
     return {};
 }
+
+struct async_future_iterator_impl
+{
+    template <typename T>
+    void next(T&& callback)
+    {
+    }
+};
+
+struct future_traversal
+{
+    template <typename V, typename... T>
+    static void of(V&& visitor, T&&...)
+    {
+    }
+};
+
+struct async_future_traversal
+{
+    template <typename V, typename... T>
+    static void of(V&& visitor, T&&...)
+    {
+        visitor(make_ready_future(0), [] {});
+    }
+};
 } // end namespace mocked
+
+struct future_visitor
+{
+    template <typename T, typename N>
+    void operator()(mocked::future<T> f) const
+    {
+        // Do something on f
+        f.get();
+    }
+};
+
+struct async_future_visitor
+{
+    template <typename T, typename N>
+    void operator()(mocked::future<T> f, T&& next) const
+    {
+        // Do something on f
+        f.get();
+
+        std::forward<T>(next).next();
+    }
+
+    // Called when the end is reached
+    void operator()() const
+    {
+    }
+};
+
+void testIteration()
+{
+    using namespace mocked;
+
+    future_traversal::of(future_visitor{}, make_ready_future(0), 1, 2);
+
+    async_future_traversal::of(
+        async_future_visitor{}, make_ready_future(0), 1, 2);
+}
 
 void testNewUnwrapped()
 {
@@ -158,7 +226,9 @@ void testNewUnwrapped()
         http_request("github.com"));
 }
 
-static void future_int_f1(int f1) {  }
+static void future_int_f1(int f1)
+{
+}
 
 void thenVsDataflow()
 {
@@ -167,7 +237,8 @@ void thenVsDataflow()
     hpx::future<std::size_t> res1 =
         hpx::when_all(f1, f2, f3)
             .then([](hpx::future<hpx::util::tuple<hpx::future<int>,
-                          hpx::future<int>, hpx::future<int>>>
+                          hpx::future<int>,
+                          hpx::future<int>>>
                           v) -> std::size_t {
                 //
                 return 0;
@@ -179,17 +250,18 @@ void thenVsDataflow()
             return 0;
         });
 
-    auto res2 = hpx::dataflow(hpx::launch::async, fn, hpx::make_ready_future(1));
+    auto res2 =
+        hpx::dataflow(hpx::launch::async, fn, hpx::make_ready_future(1));
 
     hpx::future<int> ff = hpx::async([] { return 0; });
 
     auto res4 = hpx::dataflow(&future_int_f1, 0);
 
-    auto res3 = hpx::dataflow([] (int) { }, 1);
+    auto res3 = hpx::dataflow([](int) {}, 1);
 
     hpx::make_ready_future(0)
         .then([](hpx::future<int> i) { return 0; })
         .then([](hpx::future<int> i) {
-            
+
         });
 }
