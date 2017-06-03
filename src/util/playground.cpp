@@ -103,8 +103,14 @@ struct future
         return false;
     }
 
-    template <typename T>
-    future then(T&&)
+    template <typename F>
+    future then(F&&)
+    {
+        return {};
+    }
+
+    template <typename F>
+    future then_spread(F&&)
     {
         return {};
     }
@@ -131,6 +137,13 @@ future<void> dataflow(T...)
 // Unwraps all futures by default
 template <typename T>
 future<void> plain_dataflow(T...)
+{
+    return {};
+}
+
+// Unwraps all futures by default
+template <typename T>
+future<void> when_all(T...)
 {
     return {};
 }
@@ -163,10 +176,11 @@ struct async_future_traversal
     static void of(V&& visitor, T&&...)
     {
         auto current = make_ready_future(0);
-        if (!visitor.touch(current))
-        {
-            visitor.async(current, [] { /*continuation handler*/});
+        if (!visitor.touch(current)) {
+            visitor.async(current, [] { /*continuation handler*/ });
+            return;
         }
+        // Continue
     }
 };
 } // end namespace mocked
@@ -183,10 +197,8 @@ struct future_visitor
 
 struct async_future_visitor
 {
-    // the next step is started asynchronously through invoking next,
-    // or through returning false which makes the traversal to continue synchronously
-
-    // Called for every future in the pack,
+    // Called for every future in the pack, if the method returns false,
+    // the asynchronous handler is called again.
     template <typename T>
     bool touch(mocked::future<T>& f) const
     {
@@ -247,12 +259,22 @@ void testNewUnwrapped()
 
     // Unwraps all futures by default, forwards exceptions to its returning
     // future.
-    future<unsigned> f4 = plain_dataflow(
+    future<std::size_t> f4 = plain_dataflow(
         [](std::string content) {
             // ...
             return content.size();
         },
         http_request("github.com"));
+}
+
+void testSpread()
+{
+    using namespace mocked;
+
+    when_all(http_request("github.com"), http_request("github.com"))
+        .then_spread([](std::string, std::string) {
+            // do something
+        });
 }
 
 static void future_int_f1(int f1)
