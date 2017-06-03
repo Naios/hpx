@@ -13,12 +13,14 @@
 // #include <hpx/include/local_lcos.hpp>
 // #include <hpx/hpx.hpp>
 // #include <hpx/hpx_init.hpp>
+#include <hpx/dataflow.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/lcos/when_all.hpp>
-#include <hpx/dataflow.hpp>
 #include <hpx/util/unwrapped.hpp>
 #include "hpx/include/async.hpp"
+#include "hpx/util/identity.hpp"
 
+// clang-format off
 namespace hpx { namespace util {
     namespace detail {
         namespace categories {
@@ -66,6 +68,7 @@ namespace hpx { namespace util {
         /// ...
     }
 } } // end namespace hpx::util
+// clang-format on
 
 namespace mocked {
 struct drop_by_default
@@ -91,6 +94,17 @@ struct future
     }
 
     T get()
+    {
+        return {};
+    }
+
+    bool is_ready()
+    {
+        return false;
+    }
+
+    template <typename T>
+    future then(T&&)
     {
         return {};
     }
@@ -139,6 +153,7 @@ struct future_traversal
     template <typename V, typename... T>
     static void of(V&& visitor, T&&...)
     {
+        visitor(make_ready_future(0));
     }
 };
 
@@ -147,15 +162,19 @@ struct async_future_traversal
     template <typename V, typename... T>
     static void of(V&& visitor, T&&...)
     {
-        visitor(make_ready_future(0), [] {});
+        auto current = make_ready_future(0);
+        if (!visitor.touch(current))
+        {
+            visitor.async(current, [] { /*continuation handler*/});
+        }
     }
 };
 } // end namespace mocked
 
 struct future_visitor
 {
-    template <typename T, typename N>
-    void operator()(mocked::future<T> f) const
+    template <typename T>
+    void operator()(mocked::future<T>& f) const
     {
         // Do something on f
         f.get();
@@ -164,18 +183,28 @@ struct future_visitor
 
 struct async_future_visitor
 {
-    template <typename T, typename N>
-    void operator()(mocked::future<T> f, T&& next) const
-    {
-        // Do something on f
-        f.get();
+    // the next step is started asynchronously through invoking next,
+    // or through returning false which makes the traversal to continue synchronously
 
-        std::forward<T>(next).next();
+    // Called for every future in the pack,
+    template <typename T>
+    bool touch(mocked::future<T>& f) const
+    {
+        return f.is_ready(); // Call the asynchronous handler again
+    }
+
+    template <typename T, typename N>
+    void async(mocked::future<T>& f, N&& next) const
+    {
+        // C++14 version may be converted to C++11
+        f.then([next = std::forward<N>(next)](
+            auto&&...) mutable { std::move(next)(); });
     }
 
     // Called when the end is reached
-    void operator()() const
+    void finalize() const
     {
+        // promise.resolve(...) ...
     }
 };
 
