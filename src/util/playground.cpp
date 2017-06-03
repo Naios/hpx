@@ -9,10 +9,15 @@
 
 // Testing
 #include <string>
+// #include <hpx/include/threads.hpp>
+// #include <hpx/include/local_lcos.hpp>
+// #include <hpx/hpx.hpp>
+// #include <hpx/hpx_init.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/lcos/when_all.hpp>
-#include <hpx/lcos/dataflow.hpp>
+#include <hpx/dataflow.hpp>
 #include <hpx/util/unwrapped.hpp>
+#include "hpx/include/async.hpp"
 
 namespace hpx { namespace util {
     namespace detail {
@@ -62,102 +67,129 @@ namespace hpx { namespace util {
     }
 } } // end namespace hpx::util
 
-using namespace hpx::util;
-
-struct drop_by_default { };
-
-template<typename T>
-struct mocked_future
+namespace mocked {
+struct drop_by_default
 {
-    mocked_future() { }
+};
 
-    template<typename O>
-    mocked_future(mocked_future<O>) { }
+template <typename T>
+struct future
+{
+    future()
+    {
+    }
 
-    template<typename C = drop_by_default>
-    mocked_future unwrap(C /*error_handler*/ = drop_by_default{})
+    template <typename O>
+    future(future<O>)
+    {
+    }
+
+    template <typename C = drop_by_default>
+    future unwrap(C /*error_handler*/ = drop_by_default{})
+    {
+        return {};
+    }
+
+    T get()
     {
         return {};
     }
 };
 
-template<typename T>
-T mocked_unwrap(T t)
+template <typename T>
+T unwrap(T t)
 {
     return t;
 }
 
-template<typename T>
-mocked_future<void> mocked_dataflow(T...)
+template <typename T>
+future<void> dataflow(T...)
 {
     return {};
 }
 
 // Unwraps all futures by default
-template<typename T>
-mocked_future<void> mocked_plain_dataflow(T...)
+template <typename T>
+future<void> plain_dataflow(T...)
 {
     return {};
 }
 
-mocked_future<std::string> http_request(std::string /*url*/)
+future<std::string> http_request(std::string /*url*/)
 {
     return {};
 }
+} // end namespace mocked
 
 void testNewUnwrapped()
 {
-        // Without exception handling
-    mocked_future<void> f1 = mocked_dataflow([](std::string /*content*/)
-    {
-        // ...
-    }, http_request("github.com"));
+    using namespace mocked;
 
     // Without exception handling
-    mocked_future<void> f2 = mocked_dataflow([](std::string /*content*/)
-    {
-        // ...
-    }, http_request("github.com").unwrap());
+    future<void> f1 = dataflow(
+        [](future<std::string> /*content*/) {
+            // ...
+        },
+        http_request("github.com"));
+
+    // Without exception handling
+    future<void> f2 = dataflow(
+        [](std::string /*content*/) {
+            // ...
+        },
+        http_request("github.com").unwrap());
 
     // Seperated exception handler
-    mocked_future<void> f3 = mocked_dataflow([](std::string /*content*/)
-    {
-        // ...
-    }, http_request("github.com").unwrap([](std::exception_ptr /*exception*/)
-    {
-        // ...
-    }));
+    future<void> f3 = dataflow(
+        [](std::string /*content*/) {
+            // ...
+        },
+        http_request("github.com").unwrap([](std::exception_ptr /*exception*/) {
+            // ...
+        }));
 
     // Unwraps all futures by default, forwards exceptions to its returning
     // future.
-    mocked_future<unsigned> f4 =
-        mocked_plain_dataflow([](std::string content)
-    {
-        // ...
-        return content.size();
-    }, http_request("github.com"));
+    future<unsigned> f4 = plain_dataflow(
+        [](std::string content) {
+            // ...
+            return content.size();
+        },
+        http_request("github.com"));
 }
+
+static void future_int_f1(int f1) {  }
 
 void thenVsDataflow()
 {
     hpx::future<int> f1, f2, f3; // Dummy vector
 
-    hpx::future<std::size_t> res1 = hpx::when_all(f1, f2, f3).then(
-        [](hpx::future<hpx::util::tuple<hpx::future<int>>> v) {
+    hpx::future<std::size_t> res1 =
+        hpx::when_all(f1, f2, f3)
+            .then([](hpx::future<hpx::util::tuple<hpx::future<int>,
+                          hpx::future<int>, hpx::future<int>>>
+                          v) -> std::size_t {
+                //
+                return 0;
+            });
+
+    auto fn = static_cast<std::size_t (*)(hpx::future<int>)>(
+        [](hpx::future<int>) -> std::size_t {
             //
             return 0;
         });
 
-    hpx::future<std::size_t> res2 = hpx::dataflow(
-        [](hpx::future<hpx::util::tuple<hpx::future<int>>> v) {
-            //
-            return v.get().size();
-        },
-        f1, f2, f3);
+    auto res2 = hpx::dataflow(hpx::launch::async, fn, hpx::make_ready_future(1));
+
+    hpx::future<int> ff = hpx::async([] { return 0; });
+
+    auto res4 = hpx::dataflow(&future_int_f1, 0);
+
+    auto res3 = hpx::dataflow([] (int) { }, 1);
 
     hpx::make_ready_future(0)
         .then([](hpx::future<int> i) { return 0; })
-        .then([](auto i) {
-
+        .then([](hpx::future<int> i) {
+            
         });
 }
