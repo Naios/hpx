@@ -153,10 +153,10 @@ future<std::string> http_request(std::string /*url*/)
     return {};
 }
 
-struct async_future_iterator_impl
+struct future_mapping
 {
-    template <typename T>
-    void next(T&& callback)
+    template <typename V, typename... T>
+    static void of(V&& mapper, T&&...)
     {
     }
 };
@@ -185,8 +185,24 @@ struct async_future_traversal
 };
 } // end namespace mocked
 
+struct future_mapper
+{
+    template <typename T>
+    using should_visit = std::true_type;
+
+    template <typename T>
+    T operator()(mocked::future<T>& f) const
+    {
+        // Do something on f
+        return f.get();
+    }
+};
+
 struct future_visitor
 {
+    template <typename T>
+    using should_visit = std::true_type;
+
     template <typename T>
     void operator()(mocked::future<T>& f) const
     {
@@ -197,16 +213,19 @@ struct future_visitor
 
 struct async_future_visitor
 {
+    template <typename T>
+    using should_visit = std::true_type;
+
     // Called for every future in the pack, if the method returns false,
     // the asynchronous handler is called again.
     template <typename T>
-    bool touch(mocked::future<T>& f) const
+    bool operator()(mocked::future<T>& f) const
     {
         return f.is_ready(); // Call the asynchronous handler again
     }
 
     template <typename T, typename N>
-    void async(mocked::future<T>& f, N&& next) const
+    void operator()(mocked::future<T>& f, N&& next) const
     {
         // C++14 version may be converted to C++11
         f.then([next = std::forward<N>(next)](
@@ -214,7 +233,7 @@ struct async_future_visitor
     }
 
     // Called when the end is reached
-    void finalize() const
+    void operator()() const
     {
         // promise.resolve(...) ...
     }
@@ -223,6 +242,8 @@ struct async_future_visitor
 void testIteration()
 {
     using namespace mocked;
+
+    future_mapping::of(future_mapper{}, make_ready_future(0), 1, 2);
 
     future_traversal::of(future_visitor{}, make_ready_future(0), 1, 2);
 
