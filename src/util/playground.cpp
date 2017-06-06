@@ -17,8 +17,8 @@
 #include <hpx/lcos/future.hpp>
 #include <hpx/lcos/when_all.hpp>
 #include <hpx/util/unwrapped.hpp>
-#include "hpx/include/async.hpp"
-#include "hpx/util/identity.hpp"
+#include <hpx/include/async.hpp>
+#include <hpx/util/identity.hpp>
 
 // clang-format off
 namespace hpx { namespace util {
@@ -156,9 +156,7 @@ future<std::string> http_request(std::string /*url*/)
 struct future_mapping
 {
     template <typename V, typename... T>
-    static void of(V&& mapper, T&&...)
-    {
-    }
+    static void of(V&& mapper, T&&...) { }
 };
 
 struct future_traversal
@@ -180,7 +178,7 @@ struct async_future_traversal
             visitor.async(current, [] { /*continuation handler*/ });
             return;
         }
-        // Continue
+        // continue...
     }
 };
 } // end namespace mocked
@@ -278,8 +276,8 @@ void testNewUnwrapped()
             // ...
         }));
 
-    // Unwraps all futures by default, forwards exceptions to its returning
-    // future.
+    // Unwraps all futures by default,
+    // forwards exceptions to its returning future.
     future<std::size_t> f4 = plain_dataflow(
         [](std::string content) {
             // ...
@@ -336,4 +334,9 @@ void thenVsDataflow()
         .then([](hpx::future<int> i) {
 
         });
+
+    hpx::util::unwrapped([] (int, int)
+    {
+        
+    }, hpx::make_ready_future(1))(hpx::make_ready_future(1));
 }
