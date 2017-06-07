@@ -60,6 +60,16 @@ template <typename... T> void unused(T&&... args) {
 }
 */
 
+namespace helper
+{
+    template <typename Dest, typename Source>
+    void reserve_if_possible(Dest&&, Source&&)
+    {
+        // TODO
+    }
+
+} // end namespace helper
+
 /// Tag for dispatching based on the sequenceable or container requirements
 template <bool IsContainer, bool IsSequenceable>
 struct container_match_tag
@@ -144,14 +154,20 @@ private:
     auto match(container_match_tag<true, false>, T&& element)
     {
         // TODO Remap to the specific container type
+        using container = std::vector<decltype(*element.begin())>;
+
+        // TODO Reserve the specific container if possible
 
         // T could be any container like type here,
         // take std::vector<hpx::future<int>> as an example.
-        std::vector<decltype(*element.begin())> remapped;
+        container remapped;
+        helper::reserve_if_possible(remapped, element); // No forwarding!
+
         std::transform(element.begin(),
             element.end(),
             std::back_inserter(remapped),
             traversor{this});
+
         return remapped;
     }
 
