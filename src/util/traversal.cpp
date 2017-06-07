@@ -3,17 +3,19 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+#include <algorithm>
 #include <type_traits>
 
 #include <hpx/config.hpp>
-#include <hpx/util/tuple.hpp>
 #include <hpx/traits/is_range.hpp>
 #include <hpx/traits/is_tuple_like.hpp>
+#include <hpx/util/tuple.hpp>
 
-#include <hpx/util/invoke_fused.hpp>
-
-// Testing 
+// Testing
 #include <vector>
+
+// Maybe not needed
+#include <hpx/util/invoke_fused.hpp>
 
 // #include <hpx/traits/is_future.hpp>
 
@@ -64,8 +66,13 @@ struct container_match_tag
 {
 };
 
+// clang-format off
 template <typename T>
-using container_match_of = container_match_tag<hpx::traits::is_range<T>::value, false>;
+using container_match_of = container_match_tag<
+    hpx::traits::is_range<T>::value,
+    hpx::traits::is_tuple_like<T>::value
+>;
+// clang-format on
 
 /// A helper class which applies the mapping or routes the element through
 template <typename M>
@@ -87,10 +94,15 @@ public:
 
     /// Traverses a single element
     template <typename T>
-    auto traverse(T&& element) const -> T
+    auto traverse(T&& element) // TODO C++11 auto return
     {
         // TODO Check statically, whether we should traverse the element
-        return element;
+
+        // We use tag dispatching here, to categorize the type T whether
+        // it satisfies the container or tuple like requirements.
+        // Then we can choose the underlying implementation accordingly.
+        using matcher_tag = container_match_of<typename std::decay<T>::type>;
+        return match(matcher_tag{}, std::forward<T>(element));
     }
 
     /// Calls the traversal method for every element in the pack
@@ -105,11 +117,24 @@ public:
     }
 
 private:
+    struct traversor
+    {
+        mapping_helper* helper;
+
+        template <typename T>
+        auto operator()(T&& element)
+        {
+            return helper->traverse(std::forward<T>(element));
+        }
+    };
+
     /// Match plain elments
     template <typename T>
     auto match(container_match_tag<false, false>, T&& element)
         -> decltype(mapper_(std::forward<T>(element)))
     {
+        // T could be any non container or tuple like type here,
+        // take int or hpx::future<int> as an example.
         return mapper_(std::forward<T>(element));
     }
 
@@ -118,7 +143,16 @@ private:
     template <typename T>
     auto match(container_match_tag<true, false>, T&& element)
     {
-        // TODO
+        // TODO Remap to the specific container type
+
+        // T could be any container like type here,
+        // take std::vector<hpx::future<int>> as an example.
+        std::vector<decltype(*element.begin())> remapped;
+        std::transform(element.begin(),
+            element.end(),
+            std::back_inserter(remapped),
+            traversor{this});
+        return remapped;
     }
 
     /// Match elements which are sequenced and that are also may
@@ -126,7 +160,8 @@ private:
     template <bool IsContainer, typename T>
     auto match(container_match_tag<IsContainer, true>, T&& element)
     {
-        // TODO
+        // T could be any sequenceable type here,
+        // take std::tuple<int, hpx::future<int>> as an example.
     }
 };
 
