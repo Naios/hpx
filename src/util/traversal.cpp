@@ -8,8 +8,12 @@
 #include <hpx/config.hpp>
 #include <hpx/util/tuple.hpp>
 #include <hpx/traits/is_range.hpp>
+#include <hpx/traits/is_tuple_like.hpp>
 
 #include <hpx/util/invoke_fused.hpp>
+
+// Testing 
+#include <vector>
 
 // #include <hpx/traits/is_future.hpp>
 
@@ -61,9 +65,7 @@ struct container_match_tag
 };
 
 template <typename T>
-using container_match_of = container_match_tag<hpx::traits::is_range<T>::value,
-
-    >;
+using container_match_of = container_match_tag<hpx::traits::is_range<T>::value, false>;
 
 /// A helper class which applies the mapping or routes the element through
 template <typename M>
@@ -142,4 +144,24 @@ auto traverse_pack(Mapper&& mapper, T&&... pack) -> decltype(
 void testTraversal()
 {
     traverse_pack([](auto&& el) { return el; }, 0, 1, 2);
+}
+
+void tuple_like_true()
+{
+    using hpx::traits::is_tuple_like;
+
+    static_assert(is_tuple_like<hpx::util::tuple<int, int, int>>::value, "");
+    static_assert(is_tuple_like<std::pair<int, int>>::value, "");
+
+#if defined(HPX_HAVE_CXX11_STD_ARRAY)
+    static_assert(is_tuple_like<std::array<int, 4>>::value, "");
+#endif
+}
+
+void tuple_like_false()
+{
+    using hpx::traits::is_tuple_like;
+
+    static_assert(is_tuple_like<int>::value == false, "");
+    static_assert(is_tuple_like<std::vector<int>>::value == false, "");
 }
