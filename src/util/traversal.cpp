@@ -9,13 +9,14 @@
 #include <hpx/config.hpp>
 #include <hpx/traits/is_range.hpp>
 #include <hpx/traits/is_tuple_like.hpp>
+#include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/tuple.hpp>
 
 // Testing
 #include <vector>
 
 // Maybe not needed
-#include <hpx/util/invoke_fused.hpp>
+
 
 // #include <hpx/traits/is_future.hpp>
 
@@ -155,8 +156,6 @@ private:
     {
         // TODO Remap to the specific container type
         using container = std::vector<decltype(*element.begin())>;
-
-        // TODO Reserve the specific container if possible
 
         // T could be any container like type here,
         // take std::vector<hpx::future<int>> as an example.
