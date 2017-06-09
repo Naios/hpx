@@ -190,6 +190,9 @@ namespace util {
             auto remap(T&& container, M&& mapper)
                 -> decltype(rebind_container<mapped_type_from<T, M>>(container))
             {
+                // TODO Maybe optimize thios for the case where we map to the
+                // same type, so we don't create a whole new container for
+                // that case.
                 static_assert(
                     is_back_insertable<typename std::decay<T>::type>::value,
                     "Can only remap containers which are backward insertable!");
@@ -237,12 +240,6 @@ namespace util {
               : mapper_(std::move(mapper))
             {
             }
-
-            /*template <typename T>
-    auto operator()(T&& element) const
-    {
-        return element;
-    }*/
 
             /// Traverses a single element
             template <typename T>
@@ -297,13 +294,8 @@ namespace util {
             template <typename T>
             auto match(container_match_tag<true, false>, T&& element)
             {
-                // TODO Remap to the specific container type
-                using container = std::vector<decltype(*element.begin())>;
-
-                // T could be any container like type here,
-                // take std::vector<hpx::future<int>> as an example.
-
-                return remapped;
+                return container_remapping::remap(
+                    std::forward<T>(element), traversor{this});
             }
 
             /// Match elements which are sequenced and that are also may
@@ -332,6 +324,7 @@ namespace util {
 }    // end namespace hpx
 
 #include <hpx/util/lightweight_test.hpp>
+#include <algorithm>
 #include <vector>
 
 using namespace hpx;
@@ -340,22 +333,74 @@ using namespace detail;
 
 static void testTraversal()
 {
-    traverse_pack([](auto&& el) { return el; }, 0, 1, 2);
+    auto res = traverse_pack([](int el) -> int { return el + 1; },
+        0,
+        1,
+        std::vector<int>{1, 2, 3},
+        2);
+
+    return;
 }
+
+template <typename T>
+struct my_allocator : public std::allocator<T>
+{
+    unsigned state_;
+
+    explicit my_allocator(unsigned state)
+      : state_(state)
+    {
+        return;
+    }
+
+    template <typename O>
+    my_allocator(my_allocator<O> const& other)
+      : state_(other.state_)
+    {
+        return;
+    }
+};
 
 static void testContainerRemap()
 {
     using namespace container_remapping;
 
     // Traits
-    HPX_TEST_EQ((is_back_insertable<std::vector<int>>::value), true);
-    HPX_TEST_EQ((is_back_insertable<int>::value), false);
+    {
+        HPX_TEST_EQ((is_back_insertable<std::vector<int>>::value), true);
+        HPX_TEST_EQ((is_back_insertable<int>::value), false);
+    }
 
     // Rebind
     {
-        std::vector<unsigned short> source = {1, 2, 3};
-        std::vector<unsigned long> dest =
-            remap(source, [](unsigned short i) -> unsigned long { return i; });
+        auto const remapper = [](unsigned short i) -> unsigned long {
+            return i - 1;
+        };
+
+        // Rebinds the values
+        {
+            std::vector<unsigned short> source = {1, 2, 3};
+            std::vector<unsigned long> dest = remap(source, remapper);
+
+            HPX_TEST((dest == decltype(dest){0, 1, 2}));
+        }
+
+        // Rebinds the allocator
+        {
+            static unsigned const canary = 7878787;
+
+            my_allocator<unsigned short> allocator(canary);
+            std::vector<unsigned short, my_allocator<unsigned short>> source(
+                allocator);
+            source.push_back(1);
+
+            // TODO Fix this test
+
+            /*std::vector<unsigned long, my_allocator<unsigned long>> remapped =
+                remap(source, remapper);*/
+
+            // HPX_TEST_EQ((remapped.get_allocator().state_), (canary));
+        }
     }
 }
 
