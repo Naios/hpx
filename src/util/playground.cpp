@@ -173,11 +173,11 @@ struct async_future_traversal
     template <typename V, typename... T>
     static void of(V&& visitor, T&&...)
     {
-        auto current = make_ready_future(0);
+        /*auto current = make_ready_future(0);
         if (!visitor.touch(current)) {
-            visitor.async(current, [] { /*continuation handler*/ });
+            visitor.async(current, [] {  });
             return;
-        }
+        }*/
         // continue...
     }
 };
@@ -335,8 +335,8 @@ void thenVsDataflow()
 
         });
 
-    hpx::util::unwrapped([] (int, int)
+    /*hpx::util::unwrapped([] (int, int)
     {
         
-    }, hpx::make_ready_future(1))(hpx::make_ready_future(1));
+    }, hpx::make_ready_future(1))(hpx::make_ready_future(1));*/
 }
