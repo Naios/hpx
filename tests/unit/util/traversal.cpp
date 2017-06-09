@@ -121,6 +121,7 @@ namespace util {
                     decltype(std::declval<Base<OldType, Allocator>>()
                                  .get_allocator())>::value>::type* = nullptr>
             auto rebind_container(Base<OldType, Allocator> const& container)
+                -> Base<NewType, Allocator>
             {
                 return Base<NewType, Allocator>(container.get_allocator());
             }
@@ -138,19 +139,21 @@ namespace util {
             /// different types.
             template <typename T, typename M>
             auto remap(T&& container, M&& mapper)
-            // -> decltype(rebind_container<mapped_type_from<M>>(container))
+                -> decltype(rebind_container<mapped_type_from<T, M>>(container))
             {
                 static_assert(
                     is_back_insertable<typename std::decay<T>::type>::value,
                     "Can only remap containers which are backward insertable!");
 
                 using mapped = mapped_type_from<T, M>;
+                auto remapped = rebind_container<mapped>(container);
 
-                auto rebound = rebind_container<mapped>(container);
+                std::transform(container.begin(),
+                    container.end(),
+                    std::back_inserter(remapped),
+                    std::forward<M>(mapper));
 
-                // TODO
-
-                return rebound;    // RVO
+                return remapped;    // RVO
             }
         }    // end namespace container_remapping
 
@@ -241,14 +244,8 @@ namespace util {
 
                 // T could be any container like type here,
                 // take std::vector<hpx::future<int>> as an example.
-                container remapped;
-                helper::reserve_if_possible(
-                    remapped, element);    // No forwarding!
 
-                std::transform(element.begin(),
-                    element.end(),
-                    std::back_inserter(remapped),
-                    traversor{this});
+                
 
                 return remapped;
             }
