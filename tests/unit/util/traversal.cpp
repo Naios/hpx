@@ -279,6 +279,17 @@ namespace util {
                 }
             };
 
+            struct pack_traversor
+            {
+                mapping_helper* helper;
+
+                template <typename... T>
+                auto operator()(T&&... pack)
+                {
+                    return helper->traverse_pack(std::forward<T>(pack)...);
+                }
+            };
+
             /// Match plain elments
             template <typename T>
             auto match(container_match_tag<false, false>, T&& element)
@@ -292,19 +303,23 @@ namespace util {
             /// Match elements satisfying the container requirements,
             /// which are not sequenced.
             template <typename T>
-            auto match(container_match_tag<true, false>, T&& element)
+            auto match(container_match_tag<true, false>, T&& container)
+                -> decltype(container_remapping::remap(
+                    std::forward<T>(container), std::declval<traversor>()))
             {
                 return container_remapping::remap(
-                    std::forward<T>(element), traversor{this});
+                    std::forward<T>(container), traversor{this});
             }
 
             /// Match elements which are sequenced and that are also may
             /// satisfying the container requirements.
             template <bool IsContainer, typename T>
-            auto match(container_match_tag<IsContainer, true>, T&& element)
+            auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
+                -> decltype(invoke_fused(std::declval<pack_traversor>(),
+                    std::forward<T>(tuple_like)))
             {
-                // T could be any sequenceable type here,
-                // take std::tuple<int, hpx::future<int>> as an example.
+                return invoke_fused(
+                    pack_traversor{this}, std::forward<T>(tuple_like));
             }
         };
 
