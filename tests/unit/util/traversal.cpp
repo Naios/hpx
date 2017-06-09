@@ -11,6 +11,7 @@
 #include <hpx/traits/is_tuple_like.hpp>
 #include <hpx/util/always_void.hpp>
 #include <hpx/util/invoke_fused.hpp>
+#include <hpx/util/result_of.hpp>
 #include <hpx/util/tuple.hpp>
 
 // Testing
@@ -98,15 +99,58 @@ namespace util {
                 // TODO
             }
 
+            /// Specialization for a container with a single type T
+            template <typename NewType,
+                template <class> class Base,
+                typename OldType>
+            auto rebind_container(Base<OldType> const& container)
+                -> Base<NewType>
+            {
+                return Base<NewType>();
+            }
+
+            /// Specialization for a container with a single type T and
+            /// a particular allocator, which is preserved across the remap.
+            template <typename NewType,
+                template <class, class> class Base,
+                typename OldType,
+                typename Allocator,
+                // Check whether the second argument of the container was
+                // the used allocator.
+                typename std::enable_if<std::is_same<Allocator,
+                    decltype(std::declval<Base<OldType, Allocator>>()
+                                 .get_allocator())>::value>::type* = nullptr>
+            auto rebind_container(Base<OldType, Allocator> const& container)
+            {
+                return Base<NewType, Allocator>(container.get_allocator());
+            }
+
+            /// Returns the type which is resulting if the mapping is applied to
+            /// an element in the container.
+            template <typename Container, typename Mapping>
+            using mapped_type_from =
+                decltype(std::declval<typename std::decay<Mapping>::type>()(
+                    *std::declval<typename std::decay<Container>::type&>()
+                         .begin()));
+
             /// Remaps the content of the given container with type T,
             /// to a container of the same type which may contain
             /// different types.
-            template <typename M, typename T>
-            auto remap(M&& mapper, T&& container)
+            template <typename T, typename M>
+            auto remap(T&& container, M&& mapper)
+            // -> decltype(rebind_container<mapped_type_from<M>>(container))
             {
                 static_assert(
                     is_back_insertable<typename std::decay<T>::type>::value,
-                    "Can only remap container which are backward insertable!");
+                    "Can only remap containers which are backward insertable!");
+
+                using mapped = mapped_type_from<T, M>;
+
+                auto rebound = rebind_container<mapped>(container);
+
+                // TODO
+
+                return rebound;    // RVO
             }
         }    // end namespace container_remapping
 
@@ -116,13 +160,10 @@ namespace util {
         {
         };
 
-        // clang-format off
-template <typename T>
-using container_match_of = container_match_tag<
-    hpx::traits::is_range<T>::value,
-    hpx::traits::is_tuple_like<T>::value
->;
-        // clang-format on
+        template <typename T>
+        using container_match_of =
+            container_match_tag<hpx::traits::is_range<T>::value,
+                hpx::traits::is_tuple_like<T>::value>;
 
         /// A helper class which applies the mapping or routes the element through
         template <typename M>
@@ -237,13 +278,32 @@ using container_match_of = container_match_tag<
 }    // end namespace util
 }    // end namespace hpx
 
+#include <hpx/util/lightweight_test.hpp>
+#include <vector>
+
 using namespace hpx;
 using namespace util;
 using namespace detail;
 
-void testTraversal()
+static void testTraversal()
 {
     traverse_pack([](auto&& el) { return el; }, 0, 1, 2);
+}
+
+static void testContainerRemap()
+{
+    using namespace container_remapping;
+
+    // Traits
+    HPX_TEST_EQ((is_back_insertable<std::vector<int>>::value), true);
+    HPX_TEST_EQ((is_back_insertable<int>::value), false);
+
+    // Rebind
+    {
+        std::vector<unsigned short> source = {1, 2, 3};
+        // std::vector<unsigned long> dest =
+        remap(source, [](unsigned short i) -> unsigned long { return i; });
+    }
 }
 
 int main(int argc, char* argv[])
@@ -251,10 +311,10 @@ int main(int argc, char* argv[])
     std::vector<int> i;
     auto al = i.get_allocator();
 
-    std::true_type tt1 =
-        container_remapping::is_back_insertable<std::vector<int>>{};
-    std::false_type tt2 = container_remapping::is_back_insertable<int>{};
-
     testTraversal();
-    return 0;
+    testContainerRemap();
+
+    auto result = hpx::util::report_errors();
+
+    return result;
 }
