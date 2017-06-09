@@ -299,7 +299,7 @@ namespace util {
 
         /// Tag for dispatching based on the tuple like
         /// or container requirements
-        template <bool IsContainer, bool IsSequenceable>
+        template <bool IsContainer, bool IsTupleLike>
         struct container_match_tag
         {
         };
@@ -430,7 +430,7 @@ namespace util {
 
         /// Traverses the given pack with the given mapper and strategy
         template <typename Strategy, typename Mapper, typename... T>
-        auto apply_nested_strategy(Strategy, Mapper&& mapper, T&&... pack)
+        auto apply_pack_transform(Strategy, Mapper&& mapper, T&&... pack)
             -> decltype(std::declval<mapping_helper<Strategy,
                             typename std::decay<Mapper>::type>>()
                             .traverse(std::forward<T>(pack)...))
@@ -446,11 +446,11 @@ namespace util {
     /// TODO Detailed doc
     template <typename Mapper, typename... T>
     auto remap_pack(Mapper&& mapper, T&&... pack)
-        -> decltype(detail::apply_nested_strategy(detail::strategy_remap_tag{},
+        -> decltype(detail::apply_pack_transform(detail::strategy_remap_tag{},
             std::forward<Mapper>(mapper),
             std::forward<T>(pack)...))
     {
-        return detail::apply_nested_strategy(detail::strategy_remap_tag{},
+        return detail::apply_pack_transform(detail::strategy_remap_tag{},
             std::forward<Mapper>(mapper),
             std::forward<T>(pack)...);
     }
@@ -461,7 +461,7 @@ namespace util {
     template <typename Visitor, typename... T>
     void traverse_pack(Visitor&& visitor, T&&... pack)
     {
-        detail::apply_nested_strategy(detail::strategy_traverse_tag{},
+        detail::apply_pack_transform(detail::strategy_traverse_tag{},
             std::forward<Visitor>(visitor),
             std::forward<T>(pack)...);
     }
