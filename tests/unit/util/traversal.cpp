@@ -16,6 +16,8 @@
 #include <hpx/util/tuple.hpp>
 
 // Testing
+#include <hpx/util/lightweight_test.hpp>
+#include <algorithm>
 #include <vector>
 
 // Maybe not needed
@@ -62,14 +64,19 @@ template <typename... T> void unused(T&&... args) {
   (void)use;
 }
 */
+
 namespace hpx {
 namespace util {
     namespace detail {
         /// Just traverses the pack with the given callable object,
         /// no result is returned or preserved.
-        struct strategy_traverse_tag { };
+        struct strategy_traverse_tag
+        {
+        };
         /// Remaps the variadic pack with the return values from the mapper.
-        struct strategy_remap_tag { };
+        struct strategy_remap_tag
+        {
+        };
 
         /// Provides utilities for remapping the whole content of a
         /// container like type to the same container holding different types.
@@ -186,8 +193,8 @@ namespace util {
             /// an element in the container.
             template <typename Container, typename Mapping>
             using mapped_type_from = typename invoke_result<Mapping,
-                decltype(*std::declval<typename std::decay<Container>::type&>()
-                              .begin())>::type;
+                decltype(*(std::declval<typename std::decay<Container>::type&>()
+                               .begin()))>::type;
 
             /// Remaps the content of the given container with type T,
             /// to a container of the same type which may contain
@@ -302,9 +309,29 @@ namespace util {
             container_match_tag<traits::is_range<T>::value,
                 traits::is_tuple_like<T>::value>;
 
+        /// Base class for making strategy dependent behaviour available
+        /// to the mapping_helper class.
+        template <typename Strategy>
+        struct mapping_strategy_base
+        {
+            template <typename T>
+            auto may_void(T&& element) const -> typename std::decay<T>::type
+            {
+                return std::forward<T>(element);
+            }
+        };
+        template <>
+        struct mapping_strategy_base<strategy_traverse_tag>
+        {
+            template <typename MatcherTag, typename T>
+            void may_void(T&& /*element*/) const
+            {
+            }
+        };
+
         /// A helper class which applies the mapping or routes the element through
-        template <typename M>
-        class mapping_helper
+        template <typename Strategy, typename M>
+        class mapping_helper : protected mapping_strategy_base<Strategy>
         {
             M mapper_;
 
@@ -316,16 +343,16 @@ namespace util {
 
             /// Traverses a single element
             template <typename T>
-            auto traverse(T&& element)    // TODO C++11 auto return
+            auto traverse(T&& element) -> decltype(
+                match(std::declval<
+                          container_match_of<typename std::decay<T>::type>>(),
+                    std::declval<T>()))
             {
-                // TODO Check statically, whether we should traverse the element
-
                 // We use tag dispatching here, to categorize the type T whether
                 // it satisfies the container or tuple like requirements.
                 // Then we can choose the underlying implementation accordingly.
-                using matcher_tag =
-                    container_match_of<typename std::decay<T>::type>;
-                return match(matcher_tag{}, std::forward<T>(element));
+                return match(container_match_of<typename std::decay<T>::type>{},
+                    std::forward<T>(element));
             }
 
             /// Calls the traversal method for every element in the pack,
@@ -359,10 +386,11 @@ namespace util {
             /// This works recursively, so we only call the mapper
             /// with the minimal needed set of accepted arguments.
             template <typename MatcherTag, typename T>
-            T match(MatcherTag, T&& element) const
+            auto match(MatcherTag, T&& element) const
+                -> decltype(std::declval<mapping_helper*>()->may_void(
+                    std::forward<T>(element)))
             {
-                // TODO void here
-                return std::forward<T>(element);
+                return this->may_void(std::forward<T>(element));
             }
 
             /// Match plain elements not satisfying the tuple like or
@@ -401,22 +429,44 @@ namespace util {
         };
 
         /// Traverses the given pack with the given mapper and strategy
-        template <typename Mapper, typename... T>
-        auto traverse_pack(Mapper&& mapper, T&&... pack) -> decltype(
-            std::declval<mapping_helper<typename std::decay<Mapper>::type>>()
-                .traverse(std::forward<T>(pack)...))
+        template <typename Strategy, typename Mapper, typename... T>
+        auto apply_nested_strategy(Strategy, Mapper&& mapper, T&&... pack)
+            -> decltype(std::declval<mapping_helper<Strategy,
+                            typename std::decay<Mapper>::type>>()
+                            .traverse(std::forward<T>(pack)...))
         {
-            mapping_helper<typename std::decay<Mapper>::type> helper(
+            mapping_helper<Strategy, typename std::decay<Mapper>::type> helper(
                 std::forward<Mapper>(mapper));
             return helper.traverse(std::forward<T>(pack)...);
         }
     }    // end namespace detail
+
+    /// Remaps the pack with the given mapper.
+    ///
+    /// TODO Detailed doc
+    template <typename Mapper, typename... T>
+    auto remap_pack(Mapper&& mapper, T&&... pack)
+        -> decltype(detail::apply_nested_strategy(detail::strategy_remap_tag{},
+            std::forward<Mapper>(mapper),
+            std::forward<T>(pack)...))
+    {
+        return detail::apply_nested_strategy(detail::strategy_remap_tag{},
+            std::forward<Mapper>(mapper),
+            std::forward<T>(pack)...);
+    }
+
+    /// Traverses the pack with the given visitor.
+    ///
+    /// TODO Detailed doc
+    template <typename Visitor, typename... T>
+    void traverse_pack(Visitor&& visitor, T&&... pack)
+    {
+        detail::apply_nested_strategy(detail::strategy_traverse_tag{},
+            std::forward<Visitor>(visitor),
+            std::forward<T>(pack)...);
+    }
 }    // end namespace util
 }    // end namespace hpx
-
-#include <hpx/util/lightweight_test.hpp>
-#include <algorithm>
-#include <vector>
 
 using namespace hpx;
 using namespace util;
@@ -434,14 +484,14 @@ struct my_mapper
 
 static void testTraversal()
 {
-    auto res1 = traverse_pack([](auto el) -> float { return float(el + 1.f); },
+    auto res1 = remap_pack([](auto el) -> float { return float(el + 1.f); },
         0,
         1,
         hpx::util::make_tuple(1.f, 3),
         std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}},
         2);
 
-    auto res2 = traverse_pack(my_mapper{},
+    auto res2 = remap_pack(my_mapper{},
         0,
         1,
         hpx::util::make_tuple(1.f, 3),
