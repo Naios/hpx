@@ -94,9 +94,19 @@ namespace util {
             };
 
             template <typename Dest, typename Source>
-            void reserve_if_possible(Dest&, Source&)
+            void reserve_if_possible(
+                std::true_type, Dest& dest, Source const& source)
             {
-                // TODO
+                // Reserve the mapped size
+                dest.reserve(source.size());
+            }
+
+            template <typename Dest, typename Source>
+            void reserve_if_possible(
+                std::false_type, Dest const&, Source const&)
+            {
+                // We don't do anything here, since the container doesn't
+                // support reserve
             }
 
             /// Specialization for a container with a single type T
@@ -145,11 +155,20 @@ namespace util {
                     is_back_insertable<typename std::decay<T>::type>::value,
                     "Can only remap containers which are backward insertable!");
 
+                // Create the new container, which is capable of holding
+                // the remappped types.
                 using mapped = mapped_type_from<T, M>;
                 auto remapped = rebind_container<mapped>(container);
 
-                std::transform(container.begin(),
-                    container.end(),
+                // We try to reserve the original size from the source
+                // container to the destination container.
+                reserve_if_possible(
+                    is_reservable<decltype(remapped)>{}, remapped, container);
+
+                // Perform the actual value remapping from the source to
+                // the destination.
+                std::transform(std::forward<T>(container).begin(),
+                    std::forward<T>(container).end(),
                     std::back_inserter(remapped),
                     std::forward<M>(mapper));
 
@@ -244,8 +263,6 @@ namespace util {
 
                 // T could be any container like type here,
                 // take std::vector<hpx::future<int>> as an example.
-
-                
 
                 return remapped;
             }
