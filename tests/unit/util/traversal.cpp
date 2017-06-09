@@ -341,6 +341,19 @@ namespace util {
                 }
             };
 
+            /// This method implements the functionality for routing
+            /// elements through, that aren't accepted by the mapper.
+            /// Since the real matcher methods below are failing through SFINAE,
+            /// the compiler will try to specialize this function last,
+            /// since it's the least concrete one.
+            /// This works recursively, so we only call the mapper
+            /// with the minimal needed set of accepted arguments.
+            template <typename MatcherTag, typename T>
+            T match(MatcherTag, T&& element)
+            {
+                return std::forward<T>(element);
+            }
+
             /// Match plain elments
             template <typename T>
             auto match(container_match_tag<false, false>, T&& element)
@@ -352,7 +365,7 @@ namespace util {
             }
 
             /// Match elements satisfying the container requirements,
-            /// which are not sequenced.
+            /// which are not tuple like.
             template <typename T>
             auto match(container_match_tag<true, false>, T&& container)
                 -> decltype(container_remapping::remap(
@@ -362,8 +375,9 @@ namespace util {
                     std::forward<T>(container), traversor{this});
             }
 
-            /// Match elements which are sequenced and that are also may
-            /// satisfying the container requirements.
+            /// Match elements which are tuple like and that are also may
+            /// satisfying the container requirements
+            /// -> We match tuple like types over container like ones
             template <bool IsContainer, typename T>
             auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
                 -> decltype(tuple_like_remapping::remap(
@@ -399,7 +413,8 @@ using namespace detail;
 
 struct my_mapper
 {
-    template <typename T>
+    template <typename T,
+        typename std::enable_if<std::is_same<T, int>::value>::type* = nullptr>
     float operator()(T el) const
     {
         return float(el + 1.f);
