@@ -193,9 +193,11 @@ namespace util {
                 // TODO Maybe optimize this for the case where we map to the
                 // same type, so we don't create a whole new container for
                 // that case.
-                static_assert(
-                    is_back_insertable<typename std::decay<T>::type>::value,
-                    "Can only remap containers which are backward insertable!");
+
+                // Causes errors in Clang for Windows
+                //static_assert(
+                //    is_back_insertable<typename std::decay<T>::type>::value,
+                //    "Can only remap containers which are backward insertable!");
 
                 // Create the new container, which is capable of holding
                 // the remappped types.
@@ -278,7 +280,8 @@ namespace util {
             }
         }    // end namespace tuple_like_remapping
 
-        /// Tag for dispatching based on the sequenceable or container requirements
+        /// Tag for dispatching based on the tuple like
+        /// or container requirements
         template <bool IsContainer, bool IsSequenceable>
         struct container_match_tag
         {
@@ -394,9 +397,25 @@ using namespace hpx;
 using namespace util;
 using namespace detail;
 
+struct my_mapper
+{
+    template <typename T>
+    float operator()(T el) const
+    {
+        return float(el + 1.f);
+    }
+};
+
 static void testTraversal()
 {
-    auto res = traverse_pack([](auto el) -> float { return float(el + 1.f); },
+    auto res1 = traverse_pack([](auto el) -> float { return float(el + 1.f); },
+        0,
+        1,
+        hpx::util::make_tuple(1.f, 3),
+        std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}},
+        2);
+
+    auto res2 = traverse_pack(my_mapper{},
         0,
         1,
         hpx::util::make_tuple(1.f, 3),
@@ -470,9 +489,6 @@ static void testContainerRemap()
 
 int main(int argc, char* argv[])
 {
-    std::vector<int> i;
-    auto al = i.get_allocator();
-
     testTraversal();
     testContainerRemap();
 
