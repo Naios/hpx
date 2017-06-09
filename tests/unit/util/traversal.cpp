@@ -120,7 +120,8 @@ namespace util {
             }
 
             /// Specialization for a container with a single type T and
-            /// a particular allocator, which is preserved across the remap.
+            /// a particular non templated allocator,
+            /// which is preserved across the remap.
             template <typename NewType,
                 template <class, class> class Base,
                 typename OldType,
@@ -134,6 +135,28 @@ namespace util {
                 -> Base<NewType, Allocator>
             {
                 return Base<NewType, Allocator>(container.get_allocator());
+            }
+
+            /// Specialization for a container with a single type T and
+            /// a particular templated allocator,
+            /// which is preserved across the remap.
+            /// -> This is the specialization that is used for most
+            ///    standard containers.
+            template <typename NewType,
+                template <class, class> class Base,
+                typename OldType,
+                template <class> class Allocator,
+                // Check whether the second argument of the container was
+                // the used allocator.
+                typename std::enable_if<std::is_same<Allocator<OldType>,
+                    decltype(std::declval<Base<OldType, Allocator<OldType>>>()
+                                 .get_allocator())>::value>::type* = nullptr>
+            auto rebind_container(
+                Base<OldType, Allocator<OldType>> const& container)
+                -> Base<NewType, Allocator<NewType>>
+            {
+                return Base<NewType, Allocator<NewType>>(
+                    container.get_allocator());
             }
 
             /// Returns the type which is resulting if the mapping is applied to
@@ -315,8 +338,8 @@ static void testContainerRemap()
     // Rebind
     {
         std::vector<unsigned short> source = {1, 2, 3};
-        // std::vector<unsigned long> dest =
-        remap(source, [](unsigned short i) -> unsigned long { return i; });
+        std::vector<unsigned long> dest =
+            remap(source, [](unsigned short i) -> unsigned long { return i; });
     }
 }
 
