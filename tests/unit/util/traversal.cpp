@@ -196,22 +196,11 @@ namespace util {
                 decltype(*(std::declval<typename std::decay<Container>::type&>()
                                .begin()))>::type;
 
-            template <typename T, typename M>
-            auto remap(strategy_traverse_tag, T&& container, M&& mapper) ->
-                typename always_void<mapped_type_from<T, M>>::type
-            {
-                for (auto&& element : std::forward<T>(container))
-                {
-                    std::forward<M>(mapper)(
-                        std::forward<decltype(element)>(element));
-                }
-            }
-
             /// Remaps the content of the given container with type T,
             /// to a container of the same type which may contain
             /// different types.
             template <typename T, typename M>
-            auto remap(strategy_remap_tag, T&& container, M&& mapper)
+            auto remap(T&& container, M&& mapper)
                 -> decltype(rebind_container<mapped_type_from<T, M>>(container))
             {
                 // TODO Maybe optimize this for the case where we map to the
@@ -295,13 +284,11 @@ namespace util {
             /// Remaps the content of the given tuple like type T,
             /// to a container of the same type which may contain
             /// different types.
-            // TODO support the other strategy
             template <typename T, typename M>
-            auto remap(strategy_remap_tag, T&& container, M&& mapper)
-                -> decltype(invoke_fused(
-                    std::declval<
-                        tuple_like_remapper<typename std::decay<M>::type, T>>(),
-                    std::forward<T>(container)))
+            auto remap(T&& container, M&& mapper) -> decltype(invoke_fused(
+                std::declval<
+                    tuple_like_remapper<typename std::decay<M>::type, T>>(),
+                std::forward<T>(container)))
             {
                 return invoke_fused(
                     tuple_like_remapper<typename std::decay<M>::type, T>{
@@ -398,13 +385,13 @@ namespace util {
             /// since it's the least concrete one.
             /// This works recursively, so we only call the mapper
             /// with the minimal needed set of accepted arguments.
-            /*template <typename MatcherTag, typename T, typename = void, typename = void>
+            template <typename MatcherTag, typename T>
             auto match(MatcherTag, T&& element) const
                 -> decltype(std::declval<mapping_helper*>()->may_void(
                     std::forward<T>(element)))
             {
                 return this->may_void(std::forward<T>(element));
-            }*/
+            }
 
             /// Match plain elements not satisfying the tuple like or
             /// container requirements.
@@ -425,7 +412,7 @@ namespace util {
                     std::forward<T>(container), std::declval<traversor>()))
             {
                 return container_remapping::remap(
-                    Strategy{}, std::forward<T>(container), traversor{this});
+                    std::forward<T>(container), traversor{this});
             }
 
             /// Match elements which are tuple like and that are also may
@@ -437,7 +424,7 @@ namespace util {
                     std::forward<T>(tuple_like), std::declval<traversor>()))
             {
                 return tuple_like_remapping::remap(
-                    Strategy{}, std::forward<T>(tuple_like), traversor{this});
+                    std::forward<T>(tuple_like), traversor{this});
             }
         };
 
@@ -487,8 +474,8 @@ using namespace detail;
 
 struct my_mapper
 {
-    template <typename T/*,
-        typename std::enable_if<std::is_same<T, int>::value>::type* = nullptr*/>
+    template <typename T,
+        typename std::enable_if<std::is_same<T, int>::value>::type* = nullptr>
     float operator()(T el) const
     {
         return float(el + 1.f);
@@ -509,7 +496,6 @@ static void testTraversal()
         1,
         hpx::util::make_tuple(1.f, 3),
         std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}},
-        std::vector<std::vector<float>>{{1.f, 2.f, 3.f}, {4.f, 5.f, 6.f}},
         2);
 
     return;
@@ -553,7 +539,7 @@ static void testContainerRemap()
         // Rebinds the values
         {
             std::vector<unsigned short> source = {1, 2, 3};
-            std::vector<unsigned long> dest = remap(strategy_remap_tag{}, source, remapper);
+            std::vector<unsigned long> dest = remap(source, remapper);
 
             HPX_TEST((dest == decltype(dest){0, 1, 2}));
         }
@@ -570,7 +556,7 @@ static void testContainerRemap()
             // TODO Fix this test
 
             /*std::vector<unsigned long, my_allocator<unsigned long>> remapped =
-                remap(strategy_remap_tag{}, source, remapper);*/
+                remap(source, remapper);*/
 
             // HPX_TEST_EQ((remapped.get_allocator().state_), (canary));
         }
