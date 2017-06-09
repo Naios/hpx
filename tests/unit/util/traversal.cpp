@@ -93,6 +93,22 @@ namespace util {
             {
             };
 
+            /// Deduces to a true type if the given parameter T
+            /// returns an object of type Allocator from `get_allocator()`.
+            template <typename T, typename Allocator, typename = void>
+            struct is_using_allocator : std::false_type
+            {
+            };
+            template <typename T, typename Allocator>
+            struct is_using_allocator<T,
+                Allocator,
+                typename always_void<
+                    typename std::enable_if<std::is_same<Allocator,
+                        decltype(std::declval<T>().get_allocator())>::value>::
+                        type>::type> : std::true_type
+            {
+            };
+
             template <typename Dest, typename Source>
             void reserve_if_possible(
                 std::true_type, Dest& dest, Source const& source)
@@ -128,9 +144,9 @@ namespace util {
                 typename Allocator,
                 // Check whether the second argument of the container was
                 // the used allocator.
-                typename std::enable_if<std::is_same<Allocator,
-                    decltype(std::declval<Base<OldType, Allocator>>()
-                                 .get_allocator())>::value>::type* = nullptr>
+                typename std::enable_if<
+                    is_using_allocator<Base<OldType, Allocator>,
+                        Allocator>::value>::type* = nullptr>
             auto rebind_container(Base<OldType, Allocator> const& container)
                 -> Base<NewType, Allocator>
             {
@@ -148,9 +164,9 @@ namespace util {
                 template <class> class Allocator,
                 // Check whether the second argument of the container was
                 // the used allocator.
-                typename std::enable_if<std::is_same<Allocator<OldType>,
-                    decltype(std::declval<Base<OldType, Allocator<OldType>>>()
-                                 .get_allocator())>::value>::type* = nullptr>
+                typename std::enable_if<
+                    is_using_allocator<Base<OldType, Allocator<OldType>>,
+                        Allocator<OldType>>::value>::type* = nullptr>
             auto rebind_container(
                 Base<OldType, Allocator<OldType>> const& container)
                 -> Base<NewType, Allocator<NewType>>
