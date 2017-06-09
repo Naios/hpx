@@ -17,7 +17,6 @@
 
 // Maybe not needed
 
-
 // #include <hpx/traits/is_future.hpp>
 
 // #include <hpx/lcos/future.hpp>
@@ -61,15 +60,14 @@ template <typename... T> void unused(T&&... args) {
 }
 */
 
-namespace helper
+namespace helper {
+template <typename Dest, typename Source>
+void reserve_if_possible(Dest&&, Source&&)
 {
-    template <typename Dest, typename Source>
-    void reserve_if_possible(Dest&&, Source&&)
-    {
-        // TODO
-    }
+    // TODO
+}
 
-} // end namespace helper
+}    // end namespace helper
 
 /// Tag for dispatching based on the sequenceable or container requirements
 template <bool IsContainer, bool IsSequenceable>
@@ -105,7 +103,7 @@ public:
 
     /// Traverses a single element
     template <typename T>
-    auto traverse(T&& element) // TODO C++11 auto return
+    auto traverse(T&& element)    // TODO C++11 auto return
     {
         // TODO Check statically, whether we should traverse the element
 
@@ -160,7 +158,7 @@ private:
         // T could be any container like type here,
         // take std::vector<hpx::future<int>> as an example.
         container remapped;
-        helper::reserve_if_possible(remapped, element); // No forwarding!
+        helper::reserve_if_possible(remapped, element);    // No forwarding!
 
         std::transform(element.begin(),
             element.end(),
