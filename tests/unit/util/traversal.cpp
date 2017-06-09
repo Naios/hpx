@@ -65,6 +65,12 @@ template <typename... T> void unused(T&&... args) {
 namespace hpx {
 namespace util {
     namespace detail {
+        /// Just traverses the pack with the given callable object,
+        /// no result is returned or preserved.
+        struct strategy_traverse_tag { };
+        /// Remaps the variadic pack with the return values from the mapper.
+        struct strategy_remap_tag { };
+
         /// Provides utilities for remapping the whole content of a
         /// container like type to the same container holding different types.
         namespace container_remapping {
@@ -194,6 +200,8 @@ namespace util {
                 // same type, so we don't create a whole new container for
                 // that case.
 
+                // TODO void here
+
                 // Causes errors in Clang for Windows
                 //static_assert(
                 //    is_back_insertable<typename std::decay<T>::type>::value,
@@ -239,6 +247,7 @@ namespace util {
                 auto operator()(Args&&... args)
                     -> Base<typename invoke_result<Mapper, OldArgs>::type...>
                 {
+                    // TODO void here
                     return Base<
                         typename invoke_result<Mapper, OldArgs>::type...>{
                         mapper_(std::forward<Args>(args))...};
@@ -259,6 +268,7 @@ namespace util {
                 auto operator()(Args&&... args)
                     -> Base<typename invoke_result<Mapper, OldArg>::type, Size>
                 {
+                    // TODO void here
                     return Base<typename invoke_result<Mapper, OldArg>::type,
                         Size>{{mapper_(std::forward<Args>(args))...}};
                 }
@@ -324,7 +334,7 @@ namespace util {
             auto traverse(T&&... pack) -> decltype(
                 util::make_tuple(traverse(std::forward<T>(pack))...))
             {
-                // TODO Check statically, whether we should traverse the whole pack
+                // TODO void here
                 return util::make_tuple(traverse(std::forward<T>(pack))...);
             }
 
@@ -349,17 +359,19 @@ namespace util {
             /// This works recursively, so we only call the mapper
             /// with the minimal needed set of accepted arguments.
             template <typename MatcherTag, typename T>
-            T match(MatcherTag, T&& element)
+            T match(MatcherTag, T&& element) const
             {
+                // TODO void here
                 return std::forward<T>(element);
             }
 
-            /// Match plain elments
+            /// Match plain elements not satisfying the tuple like or
+            /// container requirements.
             template <typename T>
             auto match(container_match_tag<false, false>, T&& element)
                 -> decltype(mapper_(std::forward<T>(element)))
             {
-                // T could be any non container or tuple like type here,
+                // T could be any non container or non tuple like type here,
                 // take int or hpx::future<int> as an example.
                 return mapper_(std::forward<T>(element));
             }
@@ -388,7 +400,7 @@ namespace util {
             }
         };
 
-        /// Traverses the given pack with the given mapper
+        /// Traverses the given pack with the given mapper and strategy
         template <typename Mapper, typename... T>
         auto traverse_pack(Mapper&& mapper, T&&... pack) -> decltype(
             std::declval<mapping_helper<typename std::decay<Mapper>::type>>()
@@ -398,7 +410,6 @@ namespace util {
                 std::forward<Mapper>(mapper));
             return helper.traverse(std::forward<T>(pack)...);
         }
-
     }    // end namespace detail
 }    // end namespace util
 }    // end namespace hpx
