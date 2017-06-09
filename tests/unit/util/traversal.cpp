@@ -10,6 +10,7 @@
 #include <hpx/traits/is_range.hpp>
 #include <hpx/traits/is_tuple_like.hpp>
 #include <hpx/util/always_void.hpp>
+#include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/result_of.hpp>
 #include <hpx/util/tuple.hpp>
@@ -178,10 +179,9 @@ namespace util {
             /// Returns the type which is resulting if the mapping is applied to
             /// an element in the container.
             template <typename Container, typename Mapping>
-            using mapped_type_from =
-                decltype(std::declval<typename std::decay<Mapping>::type>()(
-                    *std::declval<typename std::decay<Container>::type&>()
-                         .begin()));
+            using mapped_type_from = typename invoke_result<Mapping,
+                decltype(*std::declval<typename std::decay<Container>::type&>()
+                              .begin())>::type;
 
             /// Remaps the content of the given container with type T,
             /// to a container of the same type which may contain
@@ -190,7 +190,7 @@ namespace util {
             auto remap(T&& container, M&& mapper)
                 -> decltype(rebind_container<mapped_type_from<T, M>>(container))
             {
-                // TODO Maybe optimize thios for the case where we map to the
+                // TODO Maybe optimize this for the case where we map to the
                 // same type, so we don't create a whole new container for
                 // that case.
                 static_assert(
@@ -218,6 +218,66 @@ namespace util {
             }
         }    // end namespace container_remapping
 
+        /// Provides utilities for remapping the whole content of a
+        /// tuple like type to the same type holding different types.
+        namespace tuple_like_remapping {
+            template <typename Mapper, typename T>
+            struct tuple_like_remapper;
+
+            /// Specialization for std::tuple like types which contain
+            /// an arbitrary amount of heterogenous arguments.
+            template <typename Mapper,
+                template <class...> class Base,
+                typename... OldArgs>
+            struct tuple_like_remapper<Mapper, Base<OldArgs...>>
+            {
+                Mapper mapper_;
+
+                template <typename... Args>
+                auto operator()(Args&&... args)
+                    -> Base<typename invoke_result<Mapper, OldArgs>::type...>
+                {
+                    return Base<
+                        typename invoke_result<Mapper, OldArgs>::type...>{
+                        mapper_(std::forward<Args>(args))...};
+                }
+            };
+
+            /// Specialization for std::array like types, which contains a
+            /// compile-time known amount of homogeneous types.
+            template <typename Mapper,
+                template <class, std::size_t> class Base,
+                typename OldArg,
+                std::size_t Size>
+            struct tuple_like_remapper<Mapper, Base<OldArg, Size>>
+            {
+                Mapper mapper_;
+
+                template <typename... Args>
+                auto operator()(Args&&... args)
+                    -> Base<typename invoke_result<Mapper, OldArg>::type, Size>
+                {
+                    return Base<typename invoke_result<Mapper, OldArg>::type,
+                        Size>{{mapper_(std::forward<Args>(args))...}};
+                }
+            };
+
+            /// Remaps the content of the given tuple like type T,
+            /// to a container of the same type which may contain
+            /// different types.
+            template <typename T, typename M>
+            auto remap(T&& container, M&& mapper) -> decltype(invoke_fused(
+                std::declval<
+                    tuple_like_remapper<typename std::decay<M>::type, T>>(),
+                std::forward<T>(container)))
+            {
+                return invoke_fused(
+                    tuple_like_remapper<typename std::decay<M>::type, T>{
+                        std::forward<M>(mapper)},
+                    std::forward<T>(container));
+            }
+        }    // end namespace tuple_like_remapping
+
         /// Tag for dispatching based on the sequenceable or container requirements
         template <bool IsContainer, bool IsSequenceable>
         struct container_match_tag
@@ -226,8 +286,8 @@ namespace util {
 
         template <typename T>
         using container_match_of =
-            container_match_tag<hpx::traits::is_range<T>::value,
-                hpx::traits::is_tuple_like<T>::value>;
+            container_match_tag<traits::is_range<T>::value,
+                traits::is_tuple_like<T>::value>;
 
         /// A helper class which applies the mapping or routes the element through
         template <typename M>
@@ -258,7 +318,7 @@ namespace util {
             /// Calls the traversal method for every element in the pack
             template <typename... T>
             auto traverse_pack(/*Remapper remapper,*/ T&&... pack) -> decltype(
-                hpx::util::make_tuple(traverse(std::forward<T>(pack))...))
+                util::make_tuple(traverse(std::forward<T>(pack))...))
             {
                 // TODO Check statically, whether we should traverse the whole pack
                 //
@@ -274,19 +334,9 @@ namespace util {
 
                 template <typename T>
                 auto operator()(T&& element)
+                    -> decltype(helper->traverse(std::forward<T>(element)))
                 {
                     return helper->traverse(std::forward<T>(element));
-                }
-            };
-
-            struct pack_traversor
-            {
-                mapping_helper* helper;
-
-                template <typename... T>
-                auto operator()(T&&... pack)
-                {
-                    return helper->traverse_pack(std::forward<T>(pack)...);
                 }
             };
 
@@ -315,11 +365,11 @@ namespace util {
             /// satisfying the container requirements.
             template <bool IsContainer, typename T>
             auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
-                -> decltype(invoke_fused(std::declval<pack_traversor>(),
-                    std::forward<T>(tuple_like)))
+                -> decltype(tuple_like_remapping::remap(
+                    std::forward<T>(tuple_like), std::declval<traversor>()))
             {
-                return invoke_fused(
-                    pack_traversor{this}, std::forward<T>(tuple_like));
+                return tuple_like_remapping::remap(
+                    std::forward<T>(tuple_like), traversor{this});
             }
         };
 
@@ -348,10 +398,11 @@ using namespace detail;
 
 static void testTraversal()
 {
-    auto res = traverse_pack([](int el) -> int { return el + 1; },
+    auto res = traverse_pack([](auto el) -> float { return float(el + 1.f); },
         0,
         1,
-        std::vector<int>{1, 2, 3},
+        hpx::util::make_tuple(1.f, 3),
+        std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}},
         2);
 
     return;
@@ -428,6 +479,8 @@ int main(int argc, char* argv[])
     testContainerRemap();
 
     auto result = hpx::util::report_errors();
+
+    // hpx::util::tuple<int, int>{1, 1};
 
     return result;
 }
