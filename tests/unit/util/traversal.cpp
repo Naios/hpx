@@ -315,16 +315,14 @@ namespace util {
                 return match(matcher_tag{}, std::forward<T>(element));
             }
 
-            /// Calls the traversal method for every element in the pack
+            /// Calls the traversal method for every element in the pack,
+            /// and returns a tuple containing the remapped content.
             template <typename... T>
-            auto traverse_pack(/*Remapper remapper,*/ T&&... pack) -> decltype(
+            auto traverse(T&&... pack) -> decltype(
                 util::make_tuple(traverse(std::forward<T>(pack))...))
             {
                 // TODO Check statically, whether we should traverse the whole pack
-                //
-                // TODO Use a remapper instead of fixed hpx::util::make_tuple
-                return hpx::util::make_tuple(
-                    traverse(std::forward<T>(pack))...);
+                return util::make_tuple(traverse(std::forward<T>(pack))...);
             }
 
         private:
@@ -377,11 +375,11 @@ namespace util {
         template <typename Mapper, typename... T>
         auto traverse_pack(Mapper&& mapper, T&&... pack) -> decltype(
             std::declval<mapping_helper<typename std::decay<Mapper>::type>>()
-                .traverse_pack(std::forward<T>(pack)...))
+                .traverse(std::forward<T>(pack)...))
         {
             mapping_helper<typename std::decay<Mapper>::type> helper(
                 std::forward<Mapper>(mapper));
-            return helper.traverse_pack(std::forward<T>(pack)...);
+            return helper.traverse(std::forward<T>(pack)...);
         }
 
     }    // end namespace detail
