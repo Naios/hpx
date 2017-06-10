@@ -85,7 +85,6 @@ namespace util {
                 // Reserve the mapped size
                 dest.reserve(source.size());
             }
-
             template <typename Dest, typename Source>
             void reserve_if_possible(
                 std::false_type, Dest const&, Source const&)
@@ -328,39 +327,59 @@ namespace util {
         {
             M mapper_;
 
+            class traversal_callable_base
+            {
+            protected:
+                mapping_helper* helper_;
+
+            public:
+                explicit traversal_callable_base(mapping_helper* helper)
+                  : helper_(helper)
+                {
+                }
+
+                //                direct_map through_underlying()
+                //{
+                //    return {helper};
+                //}
+            };
+
             /// A callable object which forwards its invocations
             /// to the underlying mapper directly.
-            struct direct_map
+            class direct_map : public traversal_callable_base
             {
-                mapping_helper* helper;
+            public:
+                using traversal_callable_base::traversal_callable_base;
 
                 template <typename T>
-                auto operator()(T&& element)
-                    -> decltype(helper->mapper_(std::forward<T>(element)))
+                auto operator()(T&& element) -> decltype(
+                    this->helper_->mapper_(std::forward<T>(element)))
                 {
-                    return helper->mapper_(std::forward<T>(element));
+                    return this->helper_->mapper_(std::forward<T>(element));
                 }
             };
 
             /// A callable object which forwards its invocations
             /// to mapping_helper::traverse.
-            struct traversor
+            class traversor : public traversal_callable_base
             {
-                mapping_helper* helper;
+            public:
+                using traversal_callable_base::traversal_callable_base;
 
                 template <typename T>
-                auto operator()(T&& element) -> decltype(
-                    helper->try_traverse(Strategy{}, std::forward<T>(element)))
+                auto operator()(T&& element)
+                    -> decltype(this->helper_->try_traverse(
+                        Strategy{}, std::forward<T>(element)))
                 {
-                    return helper->try_traverse(
+                    return this->helper_->try_traverse(
                         Strategy{}, std::forward<T>(element));
                 }
-
-                direct_map through_underlying()
-                {
-                    return {helper};
-                }
             };
+
+            traversor try_matcher()
+            {
+                return traversor(this);
+            }
 
             /// This method implements the functionality for routing
             /// elements through, that aren't accepted by the mapper.
@@ -392,10 +411,10 @@ namespace util {
             template <typename T>
             auto try_match(container_match_tag<true, false>, T&& container)
                 -> decltype(container_remapping::remap(Strategy{},
-                    std::forward<T>(container), std::declval<traversor>()))
+                    std::forward<T>(container), try_matcher()))
             {
                 return container_remapping::remap(
-                    Strategy{}, std::forward<T>(container), traversor{this});
+                    Strategy{}, std::forward<T>(container), try_matcher());
             }
 
             /// Match elements which are tuple like and that also may
@@ -405,10 +424,10 @@ namespace util {
             auto try_match(
                 container_match_tag<IsContainer, true>, T&& tuple_like)
                 -> decltype(tuple_like_remapping::remap(Strategy{},
-                    std::forward<T>(tuple_like), std::declval<traversor>()))
+                    std::forward<T>(tuple_like), try_matcher()))
             {
                 return tuple_like_remapping::remap(
-                    Strategy{}, std::forward<T>(tuple_like), traversor{this});
+                    Strategy{}, std::forward<T>(tuple_like), try_matcher());
             }
 
             /// SFINAE helper for plain elements not satisfying the tuple like
@@ -422,14 +441,15 @@ namespace util {
             template <typename T>
             auto match(container_match_tag<true, false>, T&& container)
                 -> decltype(container_remapping::remap(Strategy{},
-                    std::forward<T>(container), std::declval<traversor>()));
+                    std::forward<T>(container), try_matcher()));
 
             /// SFINAE helper for elements which are tuple like and
             /// that also may satisfy the container requirements
             template <bool IsContainer, typename T>
             auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
                 -> decltype(tuple_like_remapping::remap(Strategy{},
-                    std::forward<T>(tuple_like), std::declval<traversor>()));
+                    std::forward<T>(tuple_like),
+                    try_matcher()));
 
         public:
             explicit mapping_helper(M mapper)
@@ -473,7 +493,8 @@ namespace util {
             /// without preserving the return values of the mapper.
             template <typename First, typename Second, typename... T>
             auto try_traverse(strategy_traverse_tag strategy, First&& first,
-                Second&& second, T&&... rest) -> typename always_void<    // ...
+                Second&& second,
+                T&&... rest) -> typename always_void<    // ...
                 decltype(try_traverse(strategy, std::forward<First>(first))),
                 decltype(try_traverse(strategy, std::forward<Second>(second))),
                 decltype(
@@ -526,8 +547,8 @@ namespace util {
             std::forward<Visitor>(visitor),
             std::forward<T>(pack)...);
     }
-}    // end namespace util
-}    // end namespace hpx
+}    // namespace util
+}    // namespace hpx
 
 using namespace hpx;
 using namespace hpx::util;
