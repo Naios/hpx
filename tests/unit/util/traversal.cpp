@@ -193,14 +193,12 @@ namespace util {
             /// to a container of the same type which may contain
             /// different types.
             template <typename T, typename M>
-            auto remap(T&& container, M&& mapper)
+            auto remap(strategy_remap_tag, T&& container, M&& mapper)
                 -> decltype(rebind_container<mapped_type_from<T, M>>(container))
             {
                 // TODO Maybe optimize this for the case where we map to the
                 // same type, so we don't create a whole new container for
                 // that case.
-
-                // TODO void here
 
                 // Causes errors in Clang for Windows
                 //static_assert(
@@ -225,6 +223,18 @@ namespace util {
                     std::forward<M>(mapper));
 
                 return remapped;    // RVO
+            }
+
+            /// Just call the visitor with the content of the container
+            template <typename T, typename M>
+            auto remap(strategy_traverse_tag, T&& container, M&& mapper) ->
+                typename always_void<mapped_type_from<T, M>>::type
+            {
+                for (auto&& element : std::forward<T>(container))
+                {
+                    std::forward<M>(mapper)(
+                        std::forward<decltype(element)>(element));
+                }
             }
         }    // end namespace container_remapping
 
@@ -403,11 +413,11 @@ namespace util {
             /// which are not tuple like.
             template <typename T>
             auto match(container_match_tag<true, false>, T&& container)
-                -> decltype(container_remapping::remap(
+                -> decltype(container_remapping::remap(Strategy{},
                     std::forward<T>(container), std::declval<traversor>()))
             {
                 return container_remapping::remap(
-                    std::forward<T>(container), traversor{this});
+                    Strategy{}, std::forward<T>(container), traversor{this});
             }
 
             /// Match elements which are tuple like and that are also may
@@ -581,7 +591,7 @@ static void testTraversal()
         auto res = remap_pack(my_mapper{}, hpx::util::make_tuple(1.f, 3));
 
         int i = 0;
-        (void)i;
+        (void) i;
     }
 
     {
@@ -591,9 +601,11 @@ static void testTraversal()
                 HPX_TEST_EQ((el), (count + 1));
                 count = el;
             },
-            1, hpx::util::make_tuple(2, 3));
+            1,
+            hpx::util::make_tuple(
+                2, 3, std::vector<std::vector<int>>{{4, 5}, {6, 7}}));
 
-        HPX_TEST_EQ((count), (3));
+        HPX_TEST_EQ((count), (7));
     }
 
     return;
@@ -638,7 +650,8 @@ static void testContainerRemap()
         // Rebinds the values
         {
             std::vector<unsigned short> source = {1, 2, 3};
-            std::vector<unsigned long> dest = remap(source, remapper);
+            std::vector<unsigned long> dest =
+                remap(strategy_remap_tag{}, source, remapper);
 
             HPX_TEST((dest == decltype(dest){0, 1, 2}));
         }
@@ -655,7 +668,7 @@ static void testContainerRemap()
             // TODO Fix this test
 
             /*std::vector<unsigned long, my_allocator<unsigned long>> remapped =
-                remap(source, remapper);*/
+                remap(strategy_remap_tag{}, source, remapper);*/
 
             // HPX_TEST_EQ((remapped.get_allocator().state_), (canary));
         }
