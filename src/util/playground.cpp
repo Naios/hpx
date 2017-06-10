@@ -3,6 +3,8 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+#if false
+
 #include <hpx/config.hpp>
 #include <cstddef>
 #include <exception>
@@ -340,3 +342,5 @@ void thenVsDataflow()
         
     }, hpx::make_ready_future(1))(hpx::make_ready_future(1));*/
 }
+
+#endif
