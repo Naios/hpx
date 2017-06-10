@@ -49,8 +49,8 @@ namespace util {
         struct is_accepting_any_of_t;
 
         template <typename Mapper, typename First, typename... Rest>
-        struct is_accepting_any_of_t<Mapper, First, Rest...> :
-            typename std::conditional<is_accepting_t<Mapper, First>::value,
+        struct is_accepting_any_of_t<Mapper, First, Rest...>
+          : std::conditional<is_accepting_t<Mapper, First>::value,
                 std::true_type, is_accepting_any_of_t<Mapper, Rest...>>::type
         {
         };
