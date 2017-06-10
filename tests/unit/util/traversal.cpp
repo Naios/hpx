@@ -13,7 +13,7 @@
 #include <hpx/util/always_void.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
-#include <hpx/util/lazy_enable_if.hpp>
+#include <hpx/util/lazy_enable_if.hpp> // Maybe not needed
 #include <hpx/util/result_of.hpp>
 #include <hpx/util/tuple.hpp>
 
@@ -208,13 +208,6 @@ namespace util {
 
                 return remapped;    // RVO
             }
-
-            /*template <typename T, typename M>
-            struct guard_traverse
-            {
-                using type = decltype(
-                    std::declval<M>().as_traversor()(std::declval<T>()));
-            };*/
 
             /// Just call the visitor with the content of the container
             template <typename T, typename M>
