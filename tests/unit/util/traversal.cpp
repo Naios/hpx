@@ -16,6 +16,8 @@
 #include <hpx/util/tuple.hpp>
 
 // Testing
+#include <hpx/lcos/future.hpp>
+#include <hpx/traits/is_future.hpp>
 #include <hpx/util/lightweight_test.hpp>
 #include <algorithm>
 #include <vector>
@@ -527,8 +529,8 @@ namespace util {
 }    // end namespace hpx
 
 using namespace hpx;
-using namespace util;
-using namespace detail;
+using namespace hpx::util;
+using namespace hpx::util::detail;
 
 struct my_mapper
 {
@@ -610,6 +612,33 @@ static void testTraversal()
     return;
 }
 
+struct my_unwrapper
+{
+    template <typename T,
+        typename std::enable_if<traits::is_future<T>::value>::type* = nullptr>
+    auto operator()(T future) const -> decltype(std::declval<T>().get())
+    {
+        return future.get();
+    }
+};
+
+static void testEarlyUnwrapped()
+{
+    {
+        auto res = remap_pack(my_unwrapper{},    // ...
+            0, 1, hpx::lcos::make_ready_future(3),
+            hpx::util::make_tuple(hpx::lcos::make_ready_future(4),
+                hpx::lcos::make_ready_future(5)));
+
+        auto expected =
+            hpx::util::make_tuple(0, 1, 3, hpx::util::make_tuple(4, 5));
+
+        static_assert(std::is_same<decltype(res), decltype(expected)>::value,
+            "Type mismatch!");
+        HPX_TEST((res == expected));
+    }
+}
+
 template <typename T>
 struct my_allocator : public std::allocator<T>
 {
@@ -676,6 +705,7 @@ static void testContainerRemap()
 int main(int argc, char* argv[])
 {
     testTraversal();
+    testEarlyUnwrapped();
     testContainerRemap();
 
     auto result = hpx::util::report_errors();
