@@ -381,11 +381,6 @@ namespace util {
                 }
             };
 
-            traversor try_matcher()
-            {
-                return traversor(this);
-            }
-
             /// This method implements the functionality for routing
             /// elements through, that aren't accepted by the mapper.
             /// Since the real matcher methods below are failing through SFINAE,
@@ -415,11 +410,11 @@ namespace util {
             /// which are not tuple like.
             template <typename T>
             auto try_match(container_match_tag<true, false>, T&& container)
-                -> decltype(container_remapping::remap(
-                    Strategy{}, std::forward<T>(container), try_matcher()))
+                -> decltype(container_remapping::remap(Strategy{},
+                    std::forward<T>(container), std::declval<traversor>()))
             {
                 return container_remapping::remap(
-                    Strategy{}, std::forward<T>(container), try_matcher());
+                    Strategy{}, std::forward<T>(container), traversor{this});
             }
 
             /// Match elements which are tuple like and that also may
@@ -428,11 +423,11 @@ namespace util {
             template <bool IsContainer, typename T>
             auto try_match(
                 container_match_tag<IsContainer, true>, T&& tuple_like)
-                -> decltype(tuple_like_remapping::remap(
-                    Strategy{}, std::forward<T>(tuple_like), try_matcher()))
+                -> decltype(tuple_like_remapping::remap(Strategy{},
+                    std::forward<T>(tuple_like), std::declval<traversor>()))
             {
                 return tuple_like_remapping::remap(
-                    Strategy{}, std::forward<T>(tuple_like), try_matcher());
+                    Strategy{}, std::forward<T>(tuple_like), traversor{this});
             }
 
             /// SFINAE helper for plain elements not satisfying the tuple like
@@ -445,15 +440,15 @@ namespace util {
             /// requirements, which are not tuple like.
             template <typename T>
             auto match(container_match_tag<true, false>, T&& container)
-                -> decltype(container_remapping::remap(
-                    Strategy{}, std::forward<T>(container), try_matcher()));
+                -> decltype(container_remapping::remap(Strategy{},
+                    std::forward<T>(container), std::declval<traversor>()));
 
             /// SFINAE helper for elements which are tuple like and
             /// that also may satisfy the container requirements
             template <bool IsContainer, typename T>
             auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
-                -> decltype(tuple_like_remapping::remap(
-                    Strategy{}, std::forward<T>(tuple_like), try_matcher()));
+                -> decltype(tuple_like_remapping::remap(Strategy{},
+                    std::forward<T>(tuple_like), std::declval<traversor>()));
 
         public:
             explicit mapping_helper(M mapper)
