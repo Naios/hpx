@@ -12,6 +12,7 @@
 #include <hpx/util/always_void.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
+#include <hpx/util/lazy_enable_if.hpp>
 #include <hpx/util/result_of.hpp>
 #include <hpx/util/tuple.hpp>
 
@@ -337,30 +338,10 @@ namespace util {
                 {
                 }
 
+            protected:
                 mapping_helper* get_helper()
                 {
                     return helper_;
-                }
-
-                //                direct_map through_underlying()
-                //{
-                //    return {helper};
-                //}
-            };
-
-            /// A callable object which forwards its invocations
-            /// to the underlying mapper directly.
-            class direct_map : public traversal_callable_base
-            {
-            public:
-                using traversal_callable_base::traversal_callable_base;
-
-                template <typename T>
-                auto operator()(T&& element) -> decltype(
-                    this->get_helper()->mapper_(std::forward<T>(element)))
-                {
-                    return this->get_helper()->mapper_(
-                        std::forward<T>(element));
                 }
             };
 
@@ -373,11 +354,42 @@ namespace util {
 
                 template <typename T>
                 auto operator()(T&& element)
+                    -> decltype(this->get_helper()->traverse(
+                        Strategy{}, std::forward<T>(element)))
+                {
+                    return this->get_helper()->traverse(
+                        Strategy{}, std::forward<T>(element));
+                }
+
+                traversor as_traversor()
+                {
+                    return *this;
+                }
+            };
+
+            /// A callable object which forwards its invocations
+            /// to mapping_helper::try_traverse.
+            ///
+            /// This callable object will accept any input,
+            /// since elements passed to it are passed through,
+            /// if the provided mapper doesn't accept it.
+            class try_traversor : public traversal_callable_base
+            {
+            public:
+                using traversal_callable_base::traversal_callable_base;
+
+                template <typename T>
+                auto operator()(T&& element)
                     -> decltype(this->get_helper()->try_traverse(
                         Strategy{}, std::forward<T>(element)))
                 {
                     return this->get_helper()->try_traverse(
                         Strategy{}, std::forward<T>(element));
+                }
+
+                traversor as_traversor()
+                {
+                    return { this->get_helper() };
                 }
             };
 
@@ -411,10 +423,10 @@ namespace util {
             template <typename T>
             auto try_match(container_match_tag<true, false>, T&& container)
                 -> decltype(container_remapping::remap(Strategy{},
-                    std::forward<T>(container), std::declval<traversor>()))
+                    std::forward<T>(container), std::declval<try_traversor>()))
             {
-                return container_remapping::remap(
-                    Strategy{}, std::forward<T>(container), traversor{this});
+                return container_remapping::remap(Strategy{},
+                    std::forward<T>(container), try_traversor{this});
             }
 
             /// Match elements which are tuple like and that also may
@@ -424,10 +436,10 @@ namespace util {
             auto try_match(
                 container_match_tag<IsContainer, true>, T&& tuple_like)
                 -> decltype(tuple_like_remapping::remap(Strategy{},
-                    std::forward<T>(tuple_like), std::declval<traversor>()))
+                    std::forward<T>(tuple_like), std::declval<try_traversor>()))
             {
-                return tuple_like_remapping::remap(
-                    Strategy{}, std::forward<T>(tuple_like), traversor{this});
+                return tuple_like_remapping::remap(Strategy{},
+                    std::forward<T>(tuple_like), try_traversor{this});
             }
 
             /// SFINAE helper for plain elements not satisfying the tuple like
@@ -448,7 +460,8 @@ namespace util {
             template <bool IsContainer, typename T>
             auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
                 -> decltype(tuple_like_remapping::remap(Strategy{},
-                    std::forward<T>(tuple_like), std::declval<traversor>()));
+                    std::forward<T>(tuple_like),
+                    std::declval<traversor>()));
 
         public:
             explicit mapping_helper(M mapper)
@@ -456,7 +469,24 @@ namespace util {
             {
             }
 
-            /// Traverses a single element
+            /// Traverses a single element.
+            ///
+            /// Doesn't allow routing through elements,
+            /// that aren't accepted by the mapper
+            template <typename T>
+            auto traverse(Strategy, T&& element) -> decltype(this->match(
+                std::declval<
+                    container_match_of<typename std::decay<T>::type>>(),
+                std::declval<T>()))
+            {
+                // We use tag dispatching here, to categorize the type T whether
+                // it satisfies the container or tuple like requirements.
+                // Then we can choose the underlying implementation accordingly.
+                return match(container_match_of<typename std::decay<T>::type>{},
+                    std::forward<T>(element));
+            }
+
+            /// \copybrief traverse
             template <typename T>
             auto try_traverse(Strategy, T&& element)
                 -> decltype(this->try_match(
