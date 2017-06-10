@@ -114,12 +114,10 @@ namespace util {
             {
             };
             template <typename T, typename Allocator>
-            struct is_using_allocator<T,
-                Allocator,
-                typename always_void<
-                    typename std::enable_if<std::is_same<Allocator,
-                        decltype(std::declval<T>().get_allocator())>::value>::
-                        type>::type> : std::true_type
+            struct is_using_allocator<T, Allocator,
+                typename always_void<typename std::enable_if<std::is_same<
+                    Allocator, decltype(std::declval<T>().get_allocator())>::
+                        value>::type>::type> : std::true_type
             {
             };
 
@@ -140,8 +138,7 @@ namespace util {
             }
 
             /// Specialization for a container with a single type T
-            template <typename NewType,
-                template <class> class Base,
+            template <typename NewType, template <class> class Base,
                 typename OldType>
             auto rebind_container(Base<OldType> const& container)
                 -> Base<NewType>
@@ -152,15 +149,13 @@ namespace util {
             /// Specialization for a container with a single type T and
             /// a particular non templated allocator,
             /// which is preserved across the remap.
-            template <typename NewType,
-                template <class, class> class Base,
-                typename OldType,
-                typename Allocator,
+            template <typename NewType, template <class, class> class Base,
+                typename OldType, typename Allocator,
                 // Check whether the second argument of the container was
                 // the used allocator.
-                typename std::enable_if<
-                    is_using_allocator<Base<OldType, Allocator>,
-                        Allocator>::value>::type* = nullptr>
+                typename std::enable_if<is_using_allocator<
+                    Base<OldType, Allocator>, Allocator>::value>::type* =
+                    nullptr>
             auto rebind_container(Base<OldType, Allocator> const& container)
                 -> Base<NewType, Allocator>
             {
@@ -172,10 +167,8 @@ namespace util {
             /// which is preserved across the remap.
             /// -> This is the specialization that is used for most
             ///    standard containers.
-            template <typename NewType,
-                template <class, class> class Base,
-                typename OldType,
-                template <class> class Allocator,
+            template <typename NewType, template <class, class> class Base,
+                typename OldType, template <class> class Allocator,
                 // Check whether the second argument of the container was
                 // the used allocator.
                 typename std::enable_if<
@@ -243,8 +236,7 @@ namespace util {
 
             /// Specialization for std::tuple like types which contain
             /// an arbitrary amount of heterogenous arguments.
-            template <typename Mapper,
-                template <class...> class Base,
+            template <typename Mapper, template <class...> class Base,
                 typename... OldArgs>
             struct tuple_like_remapper<Mapper, Base<OldArgs...>>
             {
@@ -263,10 +255,8 @@ namespace util {
 
             /// Specialization for std::array like types, which contains a
             /// compile-time known amount of homogeneous types.
-            template <typename Mapper,
-                template <class, std::size_t> class Base,
-                typename OldArg,
-                std::size_t Size>
+            template <typename Mapper, template <class, std::size_t> class Base,
+                typename OldArg, std::size_t Size>
             struct tuple_like_remapper<Mapper, Base<OldArg, Size>>
             {
                 Mapper mapper_;
@@ -354,13 +344,13 @@ namespace util {
             /// since it's the least concrete one.
             /// This works recursively, so we only call the mapper
             /// with the minimal needed set of accepted arguments.
-            /*template <typename MatcherTag, typename T>
+            template <typename MatcherTag, typename T>
             auto match(MatcherTag, T&& element)
                 -> decltype(std::declval<mapping_helper*>()->may_void(
                     std::forward<T>(element)))
             {
                 return this->may_void(std::forward<T>(element));
-            }*/
+            }
 
             /// Match plain elements not satisfying the tuple like or
             /// container requirements.
@@ -490,15 +480,14 @@ struct my_mapper
 static void testTraversal()
 {
     {
-        auto res = remap_pack(
-            [](auto el) -> float { return float(el + 1.f); },
+        auto res = remap_pack([](auto el) -> float { return float(el + 1.f); },
             0,
             1.f,
             hpx::util::make_tuple(1.f, 3),
             std::vector<std::vector<int>>{{1, 2}, {4, 5}},
             std::vector<std::vector<float>>{{1.f, 2.f}, {4.f, 5.f}},
             2);
-        /*
+
         auto expected = hpx::util::make_tuple(    // ...
             1.f,
             2.f,
@@ -507,10 +496,10 @@ static void testTraversal()
             std::vector<std::vector<float>>{{2.f, 3.f}, {5.f, 6.f}},
             3.f);
 
-        HPX_TEST((res == expected));*/
+        HPX_TEST((res == expected));
     }
 
-    /*{
+    {
         auto res = remap_pack(my_mapper{},
             0,
             1.f,
@@ -528,7 +517,7 @@ static void testTraversal()
             3.f);
 
         HPX_TEST((res == expected));
-    }*/
+    }
 
     return;
 }
