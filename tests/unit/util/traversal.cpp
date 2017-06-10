@@ -367,14 +367,11 @@ namespace util {
             public:
                 using traversal_callable_base::traversal_callable_base;
 
+                /// SFINAE helper
                 template <typename T>
                 auto operator()(T&& element)
                     -> decltype(this->get_helper()->traverse(
-                        Strategy{}, std::forward<T>(element)))
-                {
-                    return this->get_helper()->traverse(
-                        Strategy{}, std::forward<T>(element));
-                }
+                        Strategy{}, std::forward<T>(element)));
 
                 traversor as_traversor()
                 {
@@ -407,6 +404,27 @@ namespace util {
                     return {this->get_helper()};
                 }
             };
+
+            /// SFINAE helper for plain elements not satisfying the tuple like
+            /// or container requirements.
+            template <typename T>
+            auto match(container_match_tag<false, false>, T&& element)
+                -> decltype(mapper_(std::forward<T>(element)));
+
+            /// SFINAE helper for elements satisfying the container
+            /// requirements, which are not tuple like.
+            template <typename T>
+            auto match(container_match_tag<true, false>, T&& container)
+                -> decltype(container_remapping::remap(Strategy{},
+                    std::forward<T>(container), std::declval<traversor>()));
+
+            /// SFINAE helper for elements which are tuple like and
+            /// that also may satisfy the container requirements
+            template <bool IsContainer, typename T>
+            auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
+                -> decltype(tuple_like_remapping::remap(Strategy{},
+                    std::forward<T>(tuple_like),
+                    std::declval<traversor>()));
 
             /// This method implements the functionality for routing
             /// elements through, that aren't accepted by the mapper.
@@ -457,27 +475,6 @@ namespace util {
                     std::forward<T>(tuple_like), try_traversor{this});
             }
 
-            /// SFINAE helper for plain elements not satisfying the tuple like
-            /// or container requirements.
-            template <typename T>
-            auto match(container_match_tag<false, false>, T&& element)
-                -> decltype(mapper_(std::forward<T>(element)));
-
-            /// SFINAE helper for elements satisfying the container
-            /// requirements, which are not tuple like.
-            template <typename T>
-            auto match(container_match_tag<true, false>, T&& container)
-                -> decltype(container_remapping::remap(Strategy{},
-                    std::forward<T>(container), std::declval<traversor>()));
-
-            /// SFINAE helper for elements which are tuple like and
-            /// that also may satisfy the container requirements
-            template <bool IsContainer, typename T>
-            auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
-                -> decltype(tuple_like_remapping::remap(Strategy{},
-                    std::forward<T>(tuple_like),
-                    std::declval<traversor>()));
-
         public:
             explicit mapping_helper(M mapper)
               : mapper_(std::move(mapper))
@@ -486,20 +483,13 @@ namespace util {
 
             /// Traverses a single element.
             ///
-            /// Doesn't allow routing through elements,
+            /// SFINAE helper: Doesn't allow routing through elements,
             /// that aren't accepted by the mapper
             template <typename T>
             auto traverse(Strategy, T&& element) -> decltype(this->match(
                 std::declval<
                     container_match_of<typename std::decay<T>::type>>(),
-                std::declval<T>()))
-            {
-                // We use tag dispatching here, to categorize the type T whether
-                // it satisfies the container or tuple like requirements.
-                // Then we can choose the underlying implementation accordingly.
-                return match(container_match_of<typename std::decay<T>::type>{},
-                    std::forward<T>(element));
-            }
+                std::declval<T>()));
 
             /// \copybrief traverse
             template <typename T>
