@@ -1,4 +1,4 @@
-//  Copyright (c) 2017      Denis Blank
+//  Copyright (c) 2017 Denis Blank
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -321,12 +321,29 @@ namespace util {
             }
         };
 
-        /// A helper class which applies the mapping or routes the element through
+        /// A helper class which applies the mapping or
+        /// routes the element through
         template <typename Strategy, typename M>
         class mapping_helper : protected mapping_strategy_base<Strategy>
         {
             M mapper_;
 
+            /// A callable object which forwards its invocations
+            /// to the underlying mapper directly.
+            struct direct_map
+            {
+                mapping_helper* helper;
+
+                template <typename T>
+                auto operator()(T&& element)
+                    -> decltype(helper->mapper_(std::forward<T>(element)))
+                {
+                    return helper->mapper_(std::forward<T>(element));
+                }
+            };
+
+            /// A callable object which forwards its invocations
+            /// to mapping_helper::traverse.
             struct traversor
             {
                 mapping_helper* helper;
@@ -337,6 +354,11 @@ namespace util {
                 {
                     return helper->traverse(
                         Strategy{}, std::forward<T>(element));
+                }
+
+                direct_map through_underlying()
+                {
+                    return {helper};
                 }
             };
 
@@ -349,8 +371,7 @@ namespace util {
             /// with the minimal needed set of accepted arguments.
             template <typename MatcherTag, typename T>
             auto match(MatcherTag, T&& element)
-                -> decltype(std::declval<mapping_helper*>()->may_void(
-                    std::forward<T>(element)))
+                -> decltype(this->may_void(std::forward<T>(element)))
             {
                 return this->may_void(std::forward<T>(element));
             }
@@ -544,13 +565,6 @@ static void testTraversal()
     }
 
     {
-        auto res = remap_pack(my_mapper{}, hpx::util::make_tuple(1.f, 3));
-
-        int i = 0;
-        (void) i;
-    }
-
-    {
         int count = 0;
         traverse_pack(
             [&](int el) {
@@ -579,11 +593,12 @@ struct my_unwrapper
 
 static void testEarlyUnwrapped()
 {
+    using namespace hpx::lcos;
+
     {
         auto res = remap_pack(my_unwrapper{},    // ...
-            0, 1, hpx::lcos::make_ready_future(3),
-            hpx::util::make_tuple(hpx::lcos::make_ready_future(4),
-                hpx::lcos::make_ready_future(5)));
+            0, 1, make_ready_future(3),
+            make_tuple(make_ready_future(4), make_ready_future(5)));
 
         auto expected =
             hpx::util::make_tuple(0, 1, 3, hpx::util::make_tuple(4, 5));
