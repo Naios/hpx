@@ -375,13 +375,13 @@ namespace util {
             /// since it's the least concrete one.
             /// This works recursively, so we only call the mapper
             /// with the minimal needed set of accepted arguments.
-            template <typename MatcherTag, typename T>
+            /*template <typename MatcherTag, typename T>
             auto match(MatcherTag, T&& element)
                 -> decltype(std::declval<mapping_helper*>()->may_void(
                     std::forward<T>(element)))
             {
                 return this->may_void(std::forward<T>(element));
-            }
+            }*/
 
             /// Match plain elements not satisfying the tuple like or
             /// container requirements.
@@ -494,7 +494,7 @@ static void testTraversal()
         HPX_TEST((res == expected));
     }
 
-    {
+    /*{
         auto res = remap_pack(my_mapper{},
             0,
             1.f,
@@ -512,7 +512,7 @@ static void testTraversal()
             3.f);
 
         HPX_TEST((res == expected));
-    }
+    }*/
 
     return;
 }
