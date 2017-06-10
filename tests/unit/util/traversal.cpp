@@ -335,43 +335,6 @@ namespace util {
         {
             M mapper_;
 
-        public:
-            explicit mapping_helper(M mapper)
-              : mapper_(std::move(mapper))
-            {
-            }
-
-            /// Traverses a single element
-            template <typename T>
-            auto traverse(T&& element)/* -> decltype(
-                this->match(std::declval<
-                          container_match_of<typename std::decay<T>::type>>(),
-                    std::declval<T>()))*/
-            {
-                // We use tag dispatching here, to categorize the type T whether
-                // it satisfies the container or tuple like requirements.
-                // Then we can choose the underlying implementation accordingly.
-                return match(container_match_of<typename std::decay<T>::type>{},
-                    std::forward<T>(element));
-            }
-
-            /// Calls the traversal method for every element in the pack,
-            /// and returns a tuple containing the remapped content.
-            template <typename First, typename Second, typename... T>
-            auto traverse(First&& first, Second&& second, T&&... rest)
-                -> decltype(util::make_tuple(    // ...
-                    traverse(std::forward<First>(first)),
-                    traverse(std::forward<Second>(second)),
-                    traverse(std::forward<T>(rest))...))
-            {
-                // TODO void here
-                return util::make_tuple(    // ...
-                    traverse(std::forward<First>(first)),
-                    traverse(std::forward<Second>(second)),
-                    traverse(std::forward<T>(rest))...);
-            }
-
-        private:
             struct traversor
             {
                 mapping_helper* helper;
@@ -431,6 +394,42 @@ namespace util {
             {
                 return tuple_like_remapping::remap(
                     std::forward<T>(tuple_like), traversor{this});
+            }
+
+        public:
+            explicit mapping_helper(M mapper)
+              : mapper_(std::move(mapper))
+            {
+            }
+
+            /// Traverses a single element
+            template <typename T>
+            auto traverse(T&& element) -> decltype(this->match(
+                std::declval<
+                    container_match_of<typename std::decay<T>::type>>(),
+                std::declval<T>()))
+            {
+                // We use tag dispatching here, to categorize the type T whether
+                // it satisfies the container or tuple like requirements.
+                // Then we can choose the underlying implementation accordingly.
+                return match(container_match_of<typename std::decay<T>::type>{},
+                    std::forward<T>(element));
+            }
+
+            /// Calls the traversal method for every element in the pack,
+            /// and returns a tuple containing the remapped content.
+            template <typename First, typename Second, typename... T>
+            auto traverse(First&& first, Second&& second, T&&... rest)
+                -> decltype(util::make_tuple(    // ...
+                    traverse(std::forward<First>(first)),
+                    traverse(std::forward<Second>(second)),
+                    traverse(std::forward<T>(rest))...))
+            {
+                // TODO void here
+                return util::make_tuple(    // ...
+                    traverse(std::forward<First>(first)),
+                    traverse(std::forward<Second>(second)),
+                    traverse(std::forward<T>(rest))...);
             }
         };
 
