@@ -22,51 +22,6 @@
 #include <algorithm>
 #include <vector>
 
-// Maybe not needed
-
-// #include <hpx/traits/is_future.hpp>
-
-// #include <hpx/lcos/future.hpp>
-// #include <hpx/traits/future_traits.hpp>
-//
-//
-//
-// #include <hpx/util/detail/pack.hpp>
-// #include <hpx/util/invoke_fused.hpp>
-// #include <hpx/util/lazy_enable_if.hpp>
-// #include <hpx/util/result_of.hpp>
-//
-
-// #include <hpx/traits/concepts.hpp>
-// template <typename F, typename ... Args,
-//   HPX_CONCEPT_REQUIRES_(hpx::traits::is_action<F>::value)
-// >
-
-/*
-struct future_mapper
-{
-    template <typename T>
-    using should_visit = std::true_type;
-
-    template <typename T>
-    T operator()(mocked::future<T>& f) const
-    {
-        // Do something on f
-        return f.get();
-    }
-};
-
-template <typename... T> void unused(T&&... args) {
-  auto use = [](auto&& type) mutable {
-    (void)type;
-    return 0;
-  };
-  auto deduce = {0, use(std::forward<decltype(args)>(args))...};
-  (void)deduce;
-  (void)use;
-}
-*/
-
 namespace hpx {
 namespace util {
     namespace detail {
