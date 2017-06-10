@@ -344,7 +344,7 @@ namespace util {
             /// Traverses a single element
             template <typename T>
             auto traverse(T&& element) -> decltype(
-                match(std::declval<
+                this->match(std::declval<
                           container_match_of<typename std::decay<T>::type>>(),
                     std::declval<T>()))
             {
@@ -358,17 +358,17 @@ namespace util {
             /// Calls the traversal method for every element in the pack,
             /// and returns a tuple containing the remapped content.
             template <typename First, typename Second, typename... T>
-            auto traverse(First&& first, Second&& second, T&&... pack)
+            auto traverse(First&& first, Second&& second, T&&... rest)
                 -> decltype(util::make_tuple(    // ...
                     traverse(std::forward<First>(first)),
                     traverse(std::forward<Second>(second)),
-                    traverse(std::forward<T>(pack))...))
+                    traverse(std::forward<T>(rest))...))
             {
                 // TODO void here
                 return util::make_tuple(    // ...
                     traverse(std::forward<First>(first)),
                     traverse(std::forward<Second>(second)),
-                    traverse(std::forward<T>(pack))...);
+                    traverse(std::forward<T>(rest))...);
             }
 
         private:
