@@ -139,32 +139,36 @@ namespace util {
                     container.get_allocator());
             }
 
+            /// Deduces to the type the homogeneous container is containing
+            template <typename Container>
+            using element_of_t = decltype(*std::declval<Container>().begin());
+
             /// Returns the type which is resulting if the mapping is applied to
             /// an element in the container.
             template <typename Container, typename Mapping>
-            using mapped_type_from = typename invoke_result<Mapping,
-                decltype(*(std::declval<typename std::decay<Container>::type&>()
-                               .begin()))>::type;
+            using mapped_type_from_t =
+                typename invoke_result<Mapping, element_of_t<Container>>::type;
 
             /// Remaps the content of the given container with type T,
             /// to a container of the same type which may contain
             /// different types.
             template <typename T, typename M>
             auto remap(strategy_remap_tag, T&& container, M&& mapper)
-                -> decltype(rebind_container<mapped_type_from<T, M>>(container))
+                -> decltype(
+                    rebind_container<mapped_type_from_t<T, M>>(container))
             {
                 // TODO Maybe optimize this for the case where we map to the
                 // same type, so we don't create a whole new container for
                 // that case.
 
                 static_assert(has_push_back<typename std::decay<T>::type,
-                                  decltype(*std::declval<T>().begin())>::value,
+                                  element_of_t<T>>::value,
                     "Can only remap containers which provide a push_back "
                     "method!");
 
                 // Create the new container, which is capable of holding
                 // the remappped types.
-                using mapped = mapped_type_from<T, M>;
+                using mapped = mapped_type_from_t<T, M>;
                 auto remapped = rebind_container<mapped>(container);
 
                 // We try to reserve the original size from the source
@@ -182,10 +186,21 @@ namespace util {
                 return remapped;    // RVO
             }
 
+            /*template <typename T, typename M>
+            struct guard_traverse
+            {
+                using type = decltype(
+                    std::declval<M>().as_traversor()(std::declval<T>()));
+            };*/
+
             /// Just call the visitor with the content of the container
             template <typename T, typename M>
             auto remap(strategy_traverse_tag, T&& container, M&& mapper) ->
-                typename always_void<mapped_type_from<T, M>>::type
+                typename always_void<
+                    /* element_of_t<T>
+                     * typename guard_traverse<
+                        decltype(*std::declval<T>().begin()), M>::type,*/
+                    mapped_type_from_t<T, M>>::type
             {
                 for (auto&& element : std::forward<T>(container))
                 {
@@ -389,7 +404,7 @@ namespace util {
 
                 traversor as_traversor()
                 {
-                    return { this->get_helper() };
+                    return {this->get_helper()};
                 }
             };
 
