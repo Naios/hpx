@@ -345,16 +345,6 @@ namespace util {
                     std::forward<T>(element));
             }
 
-            /// Calls the traversal method for every element in the pack,
-            /// and returns a tuple containing the remapped content.
-            template <typename... T>
-            auto traverse(T&&... pack) -> decltype(
-                util::make_tuple(traverse(std::forward<T>(pack))...))
-            {
-                // TODO void here
-                return util::make_tuple(traverse(std::forward<T>(pack))...);
-            }
-
         private:
             struct traversor
             {
@@ -418,16 +408,28 @@ namespace util {
             }
         };
 
+        /*
+                     /// Calls the traversal method for every element in the pack,
+            /// and returns a tuple containing the remapped content.
+            template <typename... T>
+            auto traverse(T&&... pack) -> decltype(
+                util::make_tuple(traverse(std::declval<T>())...))
+            {
+                // TODO void here
+                return util::make_tuple(traverse(std::forward<T>(pack))...);
+            }
+         */
+
         /// Traverses the given pack with the given mapper and strategy
         template <typename Strategy, typename Mapper, typename... T>
         auto apply_pack_transform(Strategy, Mapper&& mapper, T&&... pack)
-            -> decltype(std::declval<mapping_helper<Strategy,
+            -> decltype(util::make_tuple(std::declval<mapping_helper<Strategy,
                             typename std::decay<Mapper>::type>>()
-                            .traverse(std::forward<T>(pack)...))
+                            .traverse(std::forward<T>(pack))...))
         {
             mapping_helper<Strategy, typename std::decay<Mapper>::type> helper(
                 std::forward<Mapper>(mapper));
-            return helper.traverse(std::forward<T>(pack)...);
+            return util::make_tuple(helper.traverse(std::forward<T>(pack))...);
         }
     }    // end namespace detail
 
@@ -475,7 +477,7 @@ struct my_mapper
 static void testTraversal()
 {
     {
-        auto res = remap_pack([](auto el) -> float { return float(el + 1.f); },
+        /*auto res =*/ remap_pack([](auto el) -> float { return float(el + 1.f); },
             0,
             1.f,
             // hpx::util::make_tuple(1.f, 3),
