@@ -114,10 +114,12 @@ namespace util {
             {
             };
             template <typename T, typename Allocator>
-            struct is_using_allocator<T, Allocator,
-                typename always_void<typename std::enable_if<std::is_same<
-                    Allocator, decltype(std::declval<T>().get_allocator())>::
-                        value>::type>::type> : std::true_type
+            struct is_using_allocator<T,
+                Allocator,
+                typename always_void<
+                    typename std::enable_if<std::is_same<Allocator,
+                        decltype(std::declval<T>().get_allocator())>::value>::
+                        type>::type> : std::true_type
             {
             };
 
@@ -138,7 +140,8 @@ namespace util {
             }
 
             /// Specialization for a container with a single type T
-            template <typename NewType, template <class> class Base,
+            template <typename NewType,
+                template <class> class Base,
                 typename OldType>
             auto rebind_container(Base<OldType> const& container)
                 -> Base<NewType>
@@ -149,13 +152,15 @@ namespace util {
             /// Specialization for a container with a single type T and
             /// a particular non templated allocator,
             /// which is preserved across the remap.
-            template <typename NewType, template <class, class> class Base,
-                typename OldType, typename Allocator,
+            template <typename NewType,
+                template <class, class> class Base,
+                typename OldType,
+                typename Allocator,
                 // Check whether the second argument of the container was
                 // the used allocator.
-                typename std::enable_if<is_using_allocator<
-                    Base<OldType, Allocator>, Allocator>::value>::type* =
-                    nullptr>
+                typename std::enable_if<
+                    is_using_allocator<Base<OldType, Allocator>,
+                        Allocator>::value>::type* = nullptr>
             auto rebind_container(Base<OldType, Allocator> const& container)
                 -> Base<NewType, Allocator>
             {
@@ -167,8 +172,10 @@ namespace util {
             /// which is preserved across the remap.
             /// -> This is the specialization that is used for most
             ///    standard containers.
-            template <typename NewType, template <class, class> class Base,
-                typename OldType, template <class> class Allocator,
+            template <typename NewType,
+                template <class, class> class Base,
+                typename OldType,
+                template <class> class Allocator,
                 // Check whether the second argument of the container was
                 // the used allocator.
                 typename std::enable_if<
@@ -236,7 +243,8 @@ namespace util {
 
             /// Specialization for std::tuple like types which contain
             /// an arbitrary amount of heterogenous arguments.
-            template <typename Mapper, template <class...> class Base,
+            template <typename Mapper,
+                template <class...> class Base,
                 typename... OldArgs>
             struct tuple_like_remapper<Mapper, Base<OldArgs...>>
             {
@@ -255,8 +263,10 @@ namespace util {
 
             /// Specialization for std::array like types, which contains a
             /// compile-time known amount of homogeneous types.
-            template <typename Mapper, template <class, std::size_t> class Base,
-                typename OldArg, std::size_t Size>
+            template <typename Mapper,
+                template <class, std::size_t> class Base,
+                typename OldArg,
+                std::size_t Size>
             struct tuple_like_remapper<Mapper, Base<OldArg, Size>>
             {
                 Mapper mapper_;
@@ -345,6 +355,22 @@ namespace util {
                     std::forward<T>(element));
             }
 
+            /// Calls the traversal method for every element in the pack,
+            /// and returns a tuple containing the remapped content.
+            template <typename First, typename Second, typename... T>
+            auto traverse(First&& first, Second&& second, T&&... pack)
+                -> decltype(util::make_tuple(    // ...
+                    traverse(std::forward<First>(first)),
+                    traverse(std::forward<Second>(second)),
+                    traverse(std::forward<T>(pack))...))
+            {
+                // TODO void here
+                return util::make_tuple(    // ...
+                    traverse(std::forward<First>(first)),
+                    traverse(std::forward<Second>(second)),
+                    traverse(std::forward<T>(pack))...);
+            }
+
         private:
             struct traversor
             {
@@ -408,28 +434,16 @@ namespace util {
             }
         };
 
-        /*
-                     /// Calls the traversal method for every element in the pack,
-            /// and returns a tuple containing the remapped content.
-            template <typename... T>
-            auto traverse(T&&... pack) -> decltype(
-                util::make_tuple(traverse(std::declval<T>())...))
-            {
-                // TODO void here
-                return util::make_tuple(traverse(std::forward<T>(pack))...);
-            }
-         */
-
         /// Traverses the given pack with the given mapper and strategy
         template <typename Strategy, typename Mapper, typename... T>
         auto apply_pack_transform(Strategy, Mapper&& mapper, T&&... pack)
-            -> decltype(util::make_tuple(std::declval<mapping_helper<Strategy,
+            -> decltype(std::declval<mapping_helper<Strategy,
                             typename std::decay<Mapper>::type>>()
-                            .traverse(std::forward<T>(pack))...))
+                            .traverse(std::forward<T>(pack)...))
         {
             mapping_helper<Strategy, typename std::decay<Mapper>::type> helper(
                 std::forward<Mapper>(mapper));
-            return util::make_tuple(helper.traverse(std::forward<T>(pack))...);
+            return helper.traverse(std::forward<T>(pack)...);
         }
     }    // end namespace detail
 
@@ -477,7 +491,8 @@ struct my_mapper
 static void testTraversal()
 {
     {
-        /*auto res =*/ remap_pack([](auto el) -> float { return float(el + 1.f); },
+        /*auto res =*/remap_pack(
+            [](auto el) -> float { return float(el + 1.f); },
             0,
             1.f,
             // hpx::util::make_tuple(1.f, 3),
