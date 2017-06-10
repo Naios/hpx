@@ -337,7 +337,10 @@ namespace util {
                 {
                 }
 
-                mapping_helper* get_helper() { return helper_; }
+                mapping_helper* get_helper()
+                {
+                    return helper_;
+                }
 
                 //                direct_map through_underlying()
                 //{
@@ -353,9 +356,11 @@ namespace util {
                 using traversal_callable_base::traversal_callable_base;
 
                 template <typename T>
-                auto operator()(T&& element) -> decltype(get_helper()->mapper_(std::forward<T>(element)))
+                auto operator()(T&& element) -> decltype(
+                    this->get_helper()->mapper_(std::forward<T>(element)))
                 {
-                    return get_helper()->mapper_(std::forward<T>(element));
+                    return this->get_helper()->mapper_(
+                        std::forward<T>(element));
                 }
             };
 
@@ -368,10 +373,10 @@ namespace util {
 
                 template <typename T>
                 auto operator()(T&& element)
-                    -> decltype(get_helper()->try_traverse(
+                    -> decltype(this->get_helper()->try_traverse(
                         Strategy{}, std::forward<T>(element)))
                 {
-                    return get_helper()->try_traverse(
+                    return this->get_helper()->try_traverse(
                         Strategy{}, std::forward<T>(element));
                 }
             };
@@ -410,8 +415,8 @@ namespace util {
             /// which are not tuple like.
             template <typename T>
             auto try_match(container_match_tag<true, false>, T&& container)
-                -> decltype(container_remapping::remap(Strategy{},
-                    std::forward<T>(container), try_matcher()))
+                -> decltype(container_remapping::remap(
+                    Strategy{}, std::forward<T>(container), try_matcher()))
             {
                 return container_remapping::remap(
                     Strategy{}, std::forward<T>(container), try_matcher());
@@ -423,8 +428,8 @@ namespace util {
             template <bool IsContainer, typename T>
             auto try_match(
                 container_match_tag<IsContainer, true>, T&& tuple_like)
-                -> decltype(tuple_like_remapping::remap(Strategy{},
-                    std::forward<T>(tuple_like), try_matcher()))
+                -> decltype(tuple_like_remapping::remap(
+                    Strategy{}, std::forward<T>(tuple_like), try_matcher()))
             {
                 return tuple_like_remapping::remap(
                     Strategy{}, std::forward<T>(tuple_like), try_matcher());
@@ -440,16 +445,15 @@ namespace util {
             /// requirements, which are not tuple like.
             template <typename T>
             auto match(container_match_tag<true, false>, T&& container)
-                -> decltype(container_remapping::remap(Strategy{},
-                    std::forward<T>(container), try_matcher()));
+                -> decltype(container_remapping::remap(
+                    Strategy{}, std::forward<T>(container), try_matcher()));
 
             /// SFINAE helper for elements which are tuple like and
             /// that also may satisfy the container requirements
             template <bool IsContainer, typename T>
             auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
-                -> decltype(tuple_like_remapping::remap(Strategy{},
-                    std::forward<T>(tuple_like),
-                    try_matcher()));
+                -> decltype(tuple_like_remapping::remap(
+                    Strategy{}, std::forward<T>(tuple_like), try_matcher()));
 
         public:
             explicit mapping_helper(M mapper)
