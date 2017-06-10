@@ -343,10 +343,10 @@ namespace util {
 
             /// Traverses a single element
             template <typename T>
-            auto traverse(T&& element) -> decltype(
+            auto traverse(T&& element)/* -> decltype(
                 this->match(std::declval<
                           container_match_of<typename std::decay<T>::type>>(),
-                    std::declval<T>()))
+                    std::declval<T>()))*/
             {
                 // We use tag dispatching here, to categorize the type T whether
                 // it satisfies the container or tuple like requirements.
