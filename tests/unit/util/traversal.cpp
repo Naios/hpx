@@ -329,7 +329,6 @@ namespace util {
 
             class traversal_callable_base
             {
-            protected:
                 mapping_helper* helper_;
 
             public:
@@ -337,6 +336,8 @@ namespace util {
                   : helper_(helper)
                 {
                 }
+
+                mapping_helper* get_helper() { return helper_; }
 
                 //                direct_map through_underlying()
                 //{
@@ -352,10 +353,9 @@ namespace util {
                 using traversal_callable_base::traversal_callable_base;
 
                 template <typename T>
-                auto operator()(T&& element) -> decltype(
-                    this->helper_->mapper_(std::forward<T>(element)))
+                auto operator()(T&& element) -> decltype(get_helper()->mapper_(std::forward<T>(element)))
                 {
-                    return this->helper_->mapper_(std::forward<T>(element));
+                    return get_helper()->mapper_(std::forward<T>(element));
                 }
             };
 
@@ -368,10 +368,10 @@ namespace util {
 
                 template <typename T>
                 auto operator()(T&& element)
-                    -> decltype(this->helper_->try_traverse(
+                    -> decltype(get_helper()->try_traverse(
                         Strategy{}, std::forward<T>(element)))
                 {
-                    return this->helper_->try_traverse(
+                    return get_helper()->try_traverse(
                         Strategy{}, std::forward<T>(element));
                 }
             };
