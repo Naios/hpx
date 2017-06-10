@@ -7,6 +7,7 @@
 #include <type_traits>
 
 #include <hpx/config.hpp>
+#include <hpx/traits/is_callable.hpp>
 #include <hpx/traits/is_range.hpp>
 #include <hpx/traits/is_tuple_like.hpp>
 #include <hpx/util/always_void.hpp>
@@ -33,6 +34,28 @@ namespace util {
         };
         /// Remaps the variadic pack with the return values from the mapper.
         struct strategy_remap_tag
+        {
+        };
+
+        /// Deduces to a true type if the type leads to at least one effective
+        /// call to the mapper.
+        template <typename Mapper, typename T>
+        using is_accepting_t =
+            traits::is_callable<typename Mapper::traversor_type, T>;
+
+        /// Deduces to a true type if any type leads to at least one effective
+        /// call to the mapper.
+        template <typename Mapper, typename... T>
+        struct is_accepting_any_of_t;
+
+        template <typename Mapper, typename First, typename... Rest>
+        struct is_accepting_any_of_t<Mapper, First, Rest...> :
+            typename std::conditional<is_accepting_t<Mapper, First>::value,
+                std::true_type, is_accepting_any_of_t<Mapper, Rest...>>::type
+        {
+        };
+        template <typename Mapper>
+        struct is_accepting_any_of_t<Mapper> : std::false_type
         {
         };
 
@@ -196,11 +219,8 @@ namespace util {
             /// Just call the visitor with the content of the container
             template <typename T, typename M>
             auto remap(strategy_traverse_tag, T&& container, M&& mapper) ->
-                typename always_void<
-                    /* element_of_t<T>
-                     * typename guard_traverse<
-                        decltype(*std::declval<T>().begin()), M>::type,*/
-                    mapped_type_from_t<T, M>>::type
+                // typename lazy_enable_if<is_accepting_t<M, element_of_t<T>>::value,
+                typename always_void<mapped_type_from_t<T, M>>::type
             {
                 for (auto&& element : std::forward<T>(container))
                 {
@@ -373,10 +393,8 @@ namespace util {
                     -> decltype(this->get_helper()->traverse(
                         Strategy{}, std::forward<T>(element)));
 
-                traversor as_traversor()
-                {
-                    return *this;
-                }
+                /// An alias to this type
+                using traversor_type = traversor;
             };
 
             /// A callable object which forwards its invocations
@@ -399,10 +417,8 @@ namespace util {
                         Strategy{}, std::forward<T>(element));
                 }
 
-                traversor as_traversor()
-                {
-                    return {this->get_helper()};
-                }
+                /// An alias to the traversor type
+                using traversor_type = traversor;
             };
 
             /// SFINAE helper for plain elements not satisfying the tuple like
