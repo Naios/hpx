@@ -231,14 +231,18 @@ namespace util {
         /// Provides utilities for remapping the whole content of a
         /// tuple like type to the same type holding different types.
         namespace tuple_like_remapping {
-            template <typename Mapper, typename T>
+            template <typename Strategy, typename Mapper, typename T>
             struct tuple_like_remapper;
+
+            // TODO enable only if at least one of the elements is accepted
+            // in the real mapper.
 
             /// Specialization for std::tuple like types which contain
             /// an arbitrary amount of heterogenous arguments.
             template <typename Mapper, template <class...> class Base,
                 typename... OldArgs>
-            struct tuple_like_remapper<Mapper, Base<OldArgs...>>
+            struct tuple_like_remapper<strategy_remap_tag, Mapper,
+                Base<OldArgs...>>
             {
                 Mapper mapper_;
 
@@ -246,10 +250,25 @@ namespace util {
                 auto operator()(Args&&... args)
                     -> Base<typename invoke_result<Mapper, OldArgs>::type...>
                 {
-                    // TODO void here
                     return Base<
                         typename invoke_result<Mapper, OldArgs>::type...>{
                         mapper_(std::forward<Args>(args))...};
+                }
+            };
+            template <typename Mapper, template <class...> class Base,
+                typename... OldArgs>
+            struct tuple_like_remapper<strategy_traverse_tag, Mapper,
+                Base<OldArgs...>>
+            {
+                Mapper mapper_;
+
+                template <typename... Args>
+                auto operator()(Args&&... args) -> typename always_void<
+                    typename invoke_result<Mapper, OldArgs>::type...>::type
+                {
+                    int dummy[] = {
+                        0, ((void) mapper_(std::forward<Args>(args)), 0)...};
+                    (void) dummy;
                 }
             };
 
@@ -257,7 +276,8 @@ namespace util {
             /// compile-time known amount of homogeneous types.
             template <typename Mapper, template <class, std::size_t> class Base,
                 typename OldArg, std::size_t Size>
-            struct tuple_like_remapper<Mapper, Base<OldArg, Size>>
+            struct tuple_like_remapper<strategy_remap_tag, Mapper,
+                Base<OldArg, Size>>
             {
                 Mapper mapper_;
 
@@ -265,24 +285,39 @@ namespace util {
                 auto operator()(Args&&... args)
                     -> Base<typename invoke_result<Mapper, OldArg>::type, Size>
                 {
-                    // TODO void here
                     return Base<typename invoke_result<Mapper, OldArg>::type,
                         Size>{{mapper_(std::forward<Args>(args))...}};
+                }
+            };
+            template <typename Mapper, template <class, std::size_t> class Base,
+                typename OldArg, std::size_t Size>
+            struct tuple_like_remapper<strategy_traverse_tag, Mapper,
+                Base<OldArg, Size>>
+            {
+                Mapper mapper_;
+
+                template <typename... Args>
+                auto operator()(Args&&... args) -> typename invoke_result<
+                    typename invoke_result<Mapper, OldArg>::type>::type
+                {
+                    int dummy[] = {
+                        0, ((void) mapper_(std::forward<Args>(args)), 0)...};
+                    (void) dummy;
                 }
             };
 
             /// Remaps the content of the given tuple like type T,
             /// to a container of the same type which may contain
             /// different types.
-            template <typename T, typename M>
-            auto remap(T&& container, M&& mapper) -> decltype(invoke_fused(
-                std::declval<
-                    tuple_like_remapper<typename std::decay<M>::type, T>>(),
-                std::forward<T>(container)))
+            template <typename Strategy, typename T, typename M>
+            auto remap(Strategy, T&& container, M&& mapper) -> decltype(
+                invoke_fused(std::declval<tuple_like_remapper<Strategy,
+                                 typename std::decay<M>::type, T>>(),
+                    std::forward<T>(container)))
             {
                 return invoke_fused(
-                    tuple_like_remapper<typename std::decay<M>::type, T>{
-                        std::forward<M>(mapper)},
+                    tuple_like_remapper<Strategy, typename std::decay<M>::type,
+                        T>{std::forward<M>(mapper)},
                     std::forward<T>(container));
             }
         }    // end namespace tuple_like_remapping
@@ -380,11 +415,11 @@ namespace util {
             /// -> We match tuple like types over container like ones
             template <bool IsContainer, typename T>
             auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
-                -> decltype(tuple_like_remapping::remap(
+                -> decltype(tuple_like_remapping::remap(Strategy{},
                     std::forward<T>(tuple_like), std::declval<traversor>()))
             {
                 return tuple_like_remapping::remap(
-                    std::forward<T>(tuple_like), traversor{this});
+                    Strategy{}, std::forward<T>(tuple_like), traversor{this});
             }
 
         public:
@@ -428,12 +463,10 @@ namespace util {
             /// without preserving the return values of the mapper.
             template <typename First, typename Second, typename... T>
             auto traverse(strategy_traverse_tag strategy, First&& first,
-                Second&& second, T&&... rest) ->
-                typename always_void<decltype(traverse(
-                                         strategy, std::forward<First>(first))),
-                    decltype(traverse(strategy, std::forward<Second>(second))),
-                    decltype(
-                        traverse(strategy, std::forward<T>(rest)))...>::type
+                Second&& second, T&&... rest) -> typename always_void<    // ...
+                decltype(traverse(strategy, std::forward<First>(first))),
+                decltype(traverse(strategy, std::forward<Second>(second))),
+                decltype(traverse(strategy, std::forward<T>(rest)))...>::type
             {
                 traverse(strategy, std::forward<First>(first));
                 traverse(strategy, std::forward<Second>(second));
@@ -542,6 +575,24 @@ static void testTraversal()
         static_assert(std::is_same<decltype(res), decltype(expected)>::value,
             "Type mismatch!");
         HPX_TEST((res == expected));
+    }
+
+    {
+        auto res = remap_pack(my_mapper{}, hpx::util::make_tuple(1.f, 3));
+
+        int i = 0;
+    }
+
+    {
+        int count = 0;
+        traverse_pack(
+            [&](int el) {
+                HPX_TEST_EQ((el), (count + 1));
+                count = el;
+            },
+            1, hpx::util::make_tuple(2, 3));
+
+        HPX_TEST_EQ((count), (3));
     }
 
     return;
