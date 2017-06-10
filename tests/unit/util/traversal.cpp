@@ -82,15 +82,15 @@ namespace util {
         /// container like type to the same container holding different types.
         namespace container_remapping {
             /// Deduces to a true type if the given parameter T
-            /// is fillable by a std::back_inserter.
-            template <typename T, typename = void>
-            struct is_back_insertable : std::false_type
+            /// has a push_back method that accepts a type of E.
+            template <typename T, typename E, typename = void>
+            struct has_push_back : std::false_type
             {
             };
-            template <typename T>
-            struct is_back_insertable<T,
-                typename always_void<decltype(std::back_inserter(
-                    std::declval<T>()))>::type> : std::true_type
+            template <typename T, typename E>
+            struct has_push_back<T, E,
+                typename always_void<decltype(std::declval<T>().push_back(
+                    std::declval<E>()))>::type> : std::true_type
             {
             };
 
@@ -200,10 +200,10 @@ namespace util {
                 // same type, so we don't create a whole new container for
                 // that case.
 
-                // Causes errors in Clang for Windows
-                //static_assert(
-                //    is_back_insertable<typename std::decay<T>::type>::value,
-                //    "Can only remap containers which are backward insertable!");
+                static_assert(has_push_back<typename std::decay<T>::type,
+                                  decltype(*std::declval<T>().begin())>::value,
+                    "Can only remap containers which provide a push_back "
+                    "method!");
 
                 // Create the new container, which is capable of holding
                 // the remappped types.
@@ -462,7 +462,6 @@ namespace util {
                     traverse(strategy, std::forward<Second>(second)),
                     traverse(strategy, std::forward<T>(rest))...))
             {
-                // TODO void here
                 return util::make_tuple(
                     traverse(strategy, std::forward<First>(first)),
                     traverse(strategy, std::forward<Second>(second)),
@@ -636,9 +635,8 @@ static void testContainerRemap()
 
     // Traits
     {
-        // Doesn't work on linux
-        // HPX_TEST_EQ((is_back_insertable<std::vector<int>>::value), true);
-        // HPX_TEST_EQ((is_back_insertable<int>::value), false);
+        HPX_TEST_EQ((has_push_back<std::vector<int>, int>::value), true);
+        HPX_TEST_EQ((has_push_back<int, int>::value), false);
     }
 
     // Rebind
@@ -681,8 +679,6 @@ int main(int argc, char* argv[])
     testContainerRemap();
 
     auto result = hpx::util::report_errors();
-
-    // hpx::util::tuple<int, int>{1, 1};
 
     return result;
 }
