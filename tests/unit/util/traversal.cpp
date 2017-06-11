@@ -39,22 +39,22 @@ namespace util {
         /// Deduces to a true type if the type leads to at least one effective
         /// call to the mapper.
         template <typename Mapper, typename T>
-        using is_accepting_t =
+        using is_effective_t =
             traits::is_invocable<typename Mapper::traversor_type, T>;
 
         /// Deduces to a true type if any type leads to at least one effective
         /// call to the mapper.
         template <typename Mapper, typename... T>
-        struct is_accepting_any_of_t;
+        struct is_effective_any_of_t;
 
         template <typename Mapper, typename First, typename... Rest>
-        struct is_accepting_any_of_t<Mapper, First, Rest...>
-          : std::conditional<is_accepting_t<Mapper, First>::value,
-                std::true_type, is_accepting_any_of_t<Mapper, Rest...>>::type
+        struct is_effective_any_of_t<Mapper, First, Rest...>
+          : std::conditional<is_effective_t<Mapper, First>::value,
+                std::true_type, is_effective_any_of_t<Mapper, Rest...>>::type
         {
         };
         template <typename Mapper>
-        struct is_accepting_any_of_t<Mapper> : std::false_type
+        struct is_effective_any_of_t<Mapper> : std::false_type
         {
         };
 
@@ -176,7 +176,7 @@ namespace util {
             /// different types.
             template <typename T, typename M,
                 typename std::enable_if<
-                    is_accepting_t<M, element_of_t<T>>::value>::type* = nullptr>
+                    is_effective_t<M, element_of_t<T>>::value>::type* = nullptr>
             auto remap(strategy_remap_tag, T&& container, M&& mapper)
                 -> decltype(
                     rebind_container<mapped_type_from_t<T, M>>(container))
@@ -213,10 +213,8 @@ namespace util {
             /// Just call the visitor with the content of the container
             template <typename T, typename M,
                 typename std::enable_if<
-                    is_accepting_t<M, element_of_t<T>>::value>::type* = nullptr>
-            auto remap(strategy_traverse_tag, T&& container, M&& mapper) ->
-                // typename lazy_enable_if<is_accepting_t<M, element_of_t<T>>::value,
-                typename always_void<mapped_type_from_t<T, M>>::type
+                    is_effective_t<M, element_of_t<T>>::value>::type* = nullptr>
+            void remap(strategy_traverse_tag, T&& container, M&& mapper)
             {
                 for (auto&& element : std::forward<T>(container))
                 {
@@ -782,7 +780,7 @@ struct mytester
 */
 
 /*
-                typename std::enable_if<is_accepting_any_of_t<Mapper,
+                typename std::enable_if<is_effective_any_of_t<Mapper,
                     OldArgs...>::value>::type* = nullptr
  */
 
@@ -790,16 +788,16 @@ struct my_int_mapper
 {
     template <typename T,
         typename std::enable_if<std::is_same<T, int>::value>::type* = nullptr>
-    void operator()(T el) const
+    auto operator()(T el) const
     {
-        // return float(el + 1.f);
+        return float(el + 1.f);
     }
 };
 
 static void testFallThrough()
 {
     traverse_pack(my_int_mapper{}, int(0), std::vector<float>{1.f, 2.f});
-    // remap_pack(my_int_mapper{}, int(0), std::vector<float>{1.f, 2.f});
+    remap_pack(my_int_mapper{}, int(0), std::vector<float>{1.f, 2.f});
 }
 
 int main(int argc, char* argv[])
@@ -819,7 +817,7 @@ int main(int argc, char* argv[])
 
     std::true_type isc = traits::is_invocable<decltype(testlm), int>{};
 
-    std::true_type tt = is_accepting_any_of_t<mytester, std::vector<int>, int>{};*/
+    std::true_type tt = is_effective_any_of_t<mytester, std::vector<int>, int>{};*/
 
     return result;
 }
