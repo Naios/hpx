@@ -13,7 +13,6 @@
 #include <hpx/util/always_void.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
-#include <hpx/util/lazy_enable_if.hpp> // Maybe not needed
 #include <hpx/util/result_of.hpp>
 #include <hpx/util/tuple.hpp>
 
@@ -41,7 +40,7 @@ namespace util {
         /// call to the mapper.
         template <typename Mapper, typename T>
         using is_accepting_t =
-            traits::is_callable<typename Mapper::traversor_type, T>;
+            traits::is_invocable<typename Mapper::traversor_type, T>;
 
         /// Deduces to a true type if any type leads to at least one effective
         /// call to the mapper.
@@ -753,21 +752,62 @@ static void testContainerRemap()
 
             // TODO Fix this test
 
-            /*std::vector<unsigned long, my_allocator<unsigned long>> remapped =
-                remap(strategy_remap_tag{}, source, remapper);*/
+            // std::vector<unsigned long, my_allocator<unsigned long>> remapped =
+            // remap(strategy_remap_tag{}, source, remapper);
 
             // HPX_TEST_EQ((remapped.get_allocator().state_), (canary));
         }
     }
 }
 
+struct mytester
+{
+    using traversor_type = mytester;
+
+    int operator()(int)
+    {
+        return 0;
+    }
+};
+
+/*
+                typename std::enable_if<is_accepting_any_of_t<Mapper,
+                    OldArgs...>::value>::type* = nullptr
+ */
+
+struct my_int_mapper
+{
+    template <typename T,
+        typename std::enable_if<std::is_same<T, int>::value>::type* = nullptr>
+    void operator()(T el) const
+    {
+        // return float(el + 1.f);
+    }
+};
+
+static void testFallThrough()
+{
+    traverse_pack(my_int_mapper{}, int(0), 1.f);
+}
+
 int main(int argc, char* argv[])
 {
-    testTraversal();
-    testEarlyUnwrapped();
-    testContainerRemap();
+    // testTraversal();
+    // testEarlyUnwrapped();
+    // testContainerRemap();
+
+    testFallThrough();
 
     auto result = hpx::util::report_errors();
+
+    /*auto testlm = [](int)
+    {
+        return 0;
+    };
+
+    std::true_type isc = traits::is_invocable<decltype(testlm), int>{};
+
+    std::true_type tt = is_accepting_any_of_t<mytester, std::vector<int>, int>{};*/
 
     return result;
 }
