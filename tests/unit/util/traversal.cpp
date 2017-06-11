@@ -796,8 +796,18 @@ struct my_int_mapper
 
 static void testFallThrough()
 {
-    traverse_pack(my_int_mapper{}, int(0), std::vector<float>{1.f, 2.f});
-    remap_pack(my_int_mapper{}, int(0), std::vector<float>{1.f, 2.f});
+    // , hpx::util::make_tuple(1.f, 2.f)
+    /*traverse_pack(my_int_mapper{}, int(0),
+        std::vector<hpx::util::tuple<float, float>>{hpx::util::make_tuple(1.f, 2.f)},
+        hpx::util::make_tuple(std::vector<float>{1.f, 2.f}));*/
+
+    traverse_pack(my_int_mapper{}, int(0),
+        // std::vector<std::vector<float>>{{1.f, 2.f}}
+        hpx::util::make_tuple(1.f, 2.f));
+
+    // auto res = remap_pack(my_int_mapper{}, int(0), std::vector<std::vector<float>>{{1.f, 2.f}});
+
+    int i = 0;
 }
 
 int main(int argc, char* argv[])
