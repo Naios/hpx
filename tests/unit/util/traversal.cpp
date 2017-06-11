@@ -227,40 +227,48 @@ namespace util {
         /// Provides utilities for remapping the whole content of a
         /// tuple like type to the same type holding different types.
         namespace tuple_like_remapping {
-            template <typename Strategy, typename Mapper, typename T>
+            template <typename Strategy, typename Mapper, typename T,
+                typename = void>
             struct tuple_like_remapper;
 
             // TODO enable only if at least one of the elements is accepted
             // in the real mapper.
 
+            /*
+             * ,
+                typename std::enable_if<
+                    is_effective_t<M, element_of_t<T>>::value>::type* = nullptr
+             */
+
             /// Specialization for std::tuple like types which contain
             /// an arbitrary amount of heterogenous arguments.
-            template <typename Mapper, template <class...> class Base,
+            template <typename M, template <class...> class Base,
                 typename... OldArgs>
-            struct tuple_like_remapper<strategy_remap_tag, Mapper,
-                Base<OldArgs...>>
+            struct tuple_like_remapper<strategy_remap_tag, M, Base<OldArgs...>,
+                typename always_void<M>::type>
             {
-                Mapper mapper_;
+                M mapper_;
 
                 template <typename... Args>
                 auto operator()(Args&&... args)
-                    -> Base<typename invoke_result<Mapper, OldArgs>::type...>
+                    -> Base<typename invoke_result<M, OldArgs>::type...>
                 {
-                    return Base<
-                        typename invoke_result<Mapper, OldArgs>::type...>{
+                    return Base<typename invoke_result<M, OldArgs>::type...>{
                         mapper_(std::forward<Args>(args))...};
                 }
             };
-            template <typename Mapper, template <class...> class Base,
+            template <typename M, template <class...> class Base,
                 typename... OldArgs>
-            struct tuple_like_remapper<strategy_traverse_tag, Mapper,
-                Base<OldArgs...>>
+            struct tuple_like_remapper<strategy_traverse_tag, M,
+                Base<OldArgs...>,
+                typename std::enable_if<
+                    is_effective_any_of_t<M, OldArgs...>::value>::type>
             {
-                Mapper mapper_;
+                M mapper_;
 
                 template <typename... Args>
                 auto operator()(Args&&... args) -> typename always_void<
-                    typename invoke_result<Mapper, OldArgs>::type...>::type
+                    typename invoke_result<M, OldArgs>::type...>::type
                 {
                     int dummy[] = {
                         0, ((void) mapper_(std::forward<Args>(args)), 0)...};
@@ -270,31 +278,31 @@ namespace util {
 
             /// Specialization for std::array like types, which contains a
             /// compile-time known amount of homogeneous types.
-            template <typename Mapper, template <class, std::size_t> class Base,
+            template <typename M, template <class, std::size_t> class Base,
                 typename OldArg, std::size_t Size>
-            struct tuple_like_remapper<strategy_remap_tag, Mapper,
-                Base<OldArg, Size>>
+            struct tuple_like_remapper<strategy_remap_tag, M,
+                Base<OldArg, Size>, typename always_void<M>::type>
             {
-                Mapper mapper_;
+                M mapper_;
 
                 template <typename... Args>
                 auto operator()(Args&&... args)
-                    -> Base<typename invoke_result<Mapper, OldArg>::type, Size>
+                    -> Base<typename invoke_result<M, OldArg>::type, Size>
                 {
-                    return Base<typename invoke_result<Mapper, OldArg>::type,
-                        Size>{{mapper_(std::forward<Args>(args))...}};
+                    return Base<typename invoke_result<M, OldArg>::type, Size>{
+                        {mapper_(std::forward<Args>(args))...}};
                 }
             };
-            template <typename Mapper, template <class, std::size_t> class Base,
+            template <typename M, template <class, std::size_t> class Base,
                 typename OldArg, std::size_t Size>
-            struct tuple_like_remapper<strategy_traverse_tag, Mapper,
-                Base<OldArg, Size>>
+            struct tuple_like_remapper<strategy_traverse_tag, M,
+                Base<OldArg, Size>, typename always_void<M>::type>
             {
-                Mapper mapper_;
+                M mapper_;
 
                 template <typename... Args>
                 auto operator()(Args&&... args) -> typename invoke_result<
-                    typename invoke_result<Mapper, OldArg>::type>::type
+                    typename invoke_result<M, OldArg>::type>::type
                 {
                     int dummy[] = {
                         0, ((void) mapper_(std::forward<Args>(args)), 0)...};
