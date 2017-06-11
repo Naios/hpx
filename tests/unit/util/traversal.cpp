@@ -174,7 +174,9 @@ namespace util {
             /// Remaps the content of the given container with type T,
             /// to a container of the same type which may contain
             /// different types.
-            template <typename T, typename M>
+            template <typename T, typename M,
+                typename std::enable_if<
+                    is_accepting_t<M, element_of_t<T>>::value>::type* = nullptr>
             auto remap(strategy_remap_tag, T&& container, M&& mapper)
                 -> decltype(
                     rebind_container<mapped_type_from_t<T, M>>(container))
@@ -209,7 +211,9 @@ namespace util {
             }
 
             /// Just call the visitor with the content of the container
-            template <typename T, typename M>
+            template <typename T, typename M,
+                typename std::enable_if<
+                    is_accepting_t<M, element_of_t<T>>::value>::type* = nullptr>
             auto remap(strategy_traverse_tag, T&& container, M&& mapper) ->
                 // typename lazy_enable_if<is_accepting_t<M, element_of_t<T>>::value,
                 typename always_void<mapped_type_from_t<T, M>>::type
@@ -596,6 +600,7 @@ using namespace hpx;
 using namespace hpx::util;
 using namespace hpx::util::detail;
 
+/*
 struct my_mapper
 {
     template <typename T,
@@ -774,6 +779,7 @@ struct mytester
         return 0;
     }
 };
+*/
 
 /*
                 typename std::enable_if<is_accepting_any_of_t<Mapper,
@@ -792,7 +798,8 @@ struct my_int_mapper
 
 static void testFallThrough()
 {
-    traverse_pack(my_int_mapper{}, int(0), 1.f);
+    traverse_pack(my_int_mapper{}, int(0), std::vector<float>{1.f, 2.f});
+    // remap_pack(my_int_mapper{}, int(0), std::vector<float>{1.f, 2.f});
 }
 
 int main(int argc, char* argv[])
