@@ -667,6 +667,11 @@ static void testTraversal()
         remap_pack(all_map{}, 0, std::vector<int>{1, 2});
     }
 
+    {
+        auto res = remap_pack(all_map{}, std::vector<std::vector<int>>{{1, 2}});
+        HPX_TEST_EQ((res[0][0]), (0));
+    }
+
     /*
     {
         auto res = remap_pack(my_mapper{},
@@ -847,7 +852,7 @@ static void testFallThrough()
             // ...
             return 0;
         },
-        0, std::vector<int>{1, 2});
+        0, std::vector<std::vector<int>>{{1, 2}});
 
     int i = 0;
 }
