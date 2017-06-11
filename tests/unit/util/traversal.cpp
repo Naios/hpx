@@ -631,6 +631,11 @@ static void testTraversal()
     }
 
     {
+        // Mainly a broken build regression test
+        traverse_pack(my_mapper{}, int(0), 1.f);
+    }
+
+    {
         auto res = remap_pack(my_mapper{},
             0,
             1.f,
