@@ -342,7 +342,7 @@ namespace util {
         template <>
         struct mapping_strategy_base<strategy_traverse_tag>
         {
-            template <typename MatcherTag, typename T>
+            template <typename T>
             void may_void(T&& /*element*/) const
             {
             }
