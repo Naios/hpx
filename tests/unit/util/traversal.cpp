@@ -187,7 +187,7 @@ namespace util {
 
                 static_assert(has_push_back<typename std::decay<T>::type,
                                   element_of_t<T>>::value,
-                    "Can only remap containers which provide a push_back "
+                    "Can only remap containers, that provide a push_back "
                     "method!");
 
                 // Create the new container, which is capable of holding
@@ -245,7 +245,8 @@ namespace util {
             template <typename M, template <class...> class Base,
                 typename... OldArgs>
             struct tuple_like_remapper<strategy_remap_tag, M, Base<OldArgs...>,
-                typename always_void<M>::type>
+                typename std::enable_if<
+                    is_effective_any_of_t<M, OldArgs...>::value>::type>
             {
                 M mapper_;
 
@@ -281,7 +282,8 @@ namespace util {
             template <typename M, template <class, std::size_t> class Base,
                 typename OldArg, std::size_t Size>
             struct tuple_like_remapper<strategy_remap_tag, M,
-                Base<OldArg, Size>, typename always_void<M>::type>
+                Base<OldArg, Size>,
+                typename std::enable_if<is_effective_t<M, OldArg>::value>::type>
             {
                 M mapper_;
 
@@ -296,7 +298,8 @@ namespace util {
             template <typename M, template <class, std::size_t> class Base,
                 typename OldArg, std::size_t Size>
             struct tuple_like_remapper<strategy_traverse_tag, M,
-                Base<OldArg, Size>, typename always_void<M>::type>
+                Base<OldArg, Size>,
+                typename std::enable_if<is_effective_t<M, OldArg>::value>::type>
             {
                 M mapper_;
 
@@ -804,16 +807,18 @@ struct my_int_mapper
 
 static void testFallThrough()
 {
-    // , hpx::util::make_tuple(1.f, 2.f)
-    /*traverse_pack(my_int_mapper{}, int(0),
-        std::vector<hpx::util::tuple<float, float>>{hpx::util::make_tuple(1.f, 2.f)},
-        hpx::util::make_tuple(std::vector<float>{1.f, 2.f}));*/
+    traverse_pack(my_int_mapper{}, int(0),
+        std::vector<hpx::util::tuple<float, float>>{
+            hpx::util::make_tuple(1.f, 2.f)},
+        hpx::util::make_tuple(std::vector<float>{1.f, 2.f}));
 
     traverse_pack(my_int_mapper{}, int(0),
-        // std::vector<std::vector<float>>{{1.f, 2.f}}
+        std::vector<std::vector<float>>{{1.f, 2.f}},
         hpx::util::make_tuple(1.f, 2.f));
 
-    // auto res = remap_pack(my_int_mapper{}, int(0), std::vector<std::vector<float>>{{1.f, 2.f}});
+    auto res = remap_pack(my_int_mapper{}, int(0),
+        std::vector<std::vector<float>>{{1.f, 2.f}},
+        hpx::util::make_tuple(77.f, 2));
 
     int i = 0;
 }
