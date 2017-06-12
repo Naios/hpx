@@ -579,10 +579,22 @@ namespace util {
                     std::forward<T>(element));
             }
 
+            /// \copybrief try_traverse
+            template <typename T>
+            auto init_traverse(Strategy strategy, T&& element)
+                -> decltype(std::declval<mapping_helper>().try_traverse(
+                    strategy, std::declval<T>()))
+            {
+                // We use tag dispatching here, to categorize the type T whether
+                // it satisfies the container or tuple like requirements.
+                // Then we can choose the underlying implementation accordingly.
+                return try_traverse(strategy, std::forward<T>(element));
+            }
+
             /// Calls the traversal method for every element in the pack,
             /// and returns a tuple containing the remapped content.
             template <typename First, typename Second, typename... T>
-            auto try_traverse(strategy_remap_tag strategy, First&& first,
+            auto init_traverse(strategy_remap_tag strategy, First&& first,
                 Second&& second, T&&... rest)
                 -> decltype(util::make_tuple(
                     try_traverse(strategy, std::forward<First>(first)),
@@ -598,13 +610,8 @@ namespace util {
             /// Calls the traversal method for every element in the pack,
             /// without preserving the return values of the mapper.
             template <typename First, typename Second, typename... T>
-            auto try_traverse(strategy_traverse_tag strategy, First&& first,
-                Second&& second,
-                T&&... rest) -> typename always_void<    // ...
-                decltype(try_traverse(strategy, std::forward<First>(first))),
-                decltype(try_traverse(strategy, std::forward<Second>(second))),
-                decltype(
-                    try_traverse(strategy, std::forward<T>(rest)))...>::type
+            void init_traverse(strategy_traverse_tag strategy, First&& first,
+                Second&& second, T&&... rest)
             {
                 try_traverse(strategy, std::forward<First>(first));
                 try_traverse(strategy, std::forward<Second>(second));
@@ -621,11 +628,11 @@ namespace util {
             Strategy strategy, Mapper&& mapper, T&&... pack)
             -> decltype(std::declval<mapping_helper<Strategy,
                             typename std::decay<Mapper>::type>>()
-                            .try_traverse(strategy, std::forward<T>(pack)...))
+                            .init_traverse(strategy, std::forward<T>(pack)...))
         {
             mapping_helper<Strategy, typename std::decay<Mapper>::type> helper(
                 std::forward<Mapper>(mapper));
-            return helper.try_traverse(strategy, std::forward<T>(pack)...);
+            return helper.init_traverse(strategy, std::forward<T>(pack)...);
         }
     }    // end namespace detail
 
