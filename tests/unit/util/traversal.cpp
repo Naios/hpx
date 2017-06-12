@@ -44,8 +44,7 @@ namespace util {
         /// call to the mapper.
         template <typename Mapper, typename T>
         using is_effective_t =
-            traits::is_invocable<typename Mapper::traversor_type,
-                T>::value;
+            traits::is_invocable<typename Mapper::traversor_type, T>;
 
         /// Deduces to a true type if any type leads to at least one effective
         /// call to the mapper.
@@ -710,7 +709,6 @@ static void testTraversal()
         HPX_TEST_EQ((res[0][0]), (0));
     }
 
-    
     {
         auto res = remap_pack(my_mapper{},
             0,
