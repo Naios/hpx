@@ -18,14 +18,16 @@
 
 // Testing
 #include <hpx/lcos/future.hpp>
+#include <hpx/traits/future_traits.hpp>
 #include <hpx/traits/is_future.hpp>
 #include <hpx/util/lightweight_test.hpp>
 #include <algorithm>
 #include <vector>
 
-#ifndef _WIN32
-#define HPX_HAVE_EXPRESSION_SFINAE
-#endif
+// TODO Find a better solution for this
+// #if !defined(HPX_MSVC)
+// #define HPX_HAVE_EXPRESSION_SFINAE
+// #endif
 
 namespace hpx {
 namespace util {
@@ -181,6 +183,7 @@ namespace util {
             template <typename T, typename M
 #ifdef HPX_HAVE_EXPRESSION_SFINAE
                 ,
+                // Support for skipping completely untouched types
                 typename std::enable_if<
                     is_effective_t<M, element_of_t<T>>::value>::type* = nullptr
 #endif
@@ -222,6 +225,7 @@ namespace util {
             template <typename T, typename M
 #ifdef HPX_HAVE_EXPRESSION_SFINAE
                 ,
+                // Support for skipping completely untouched types
                 typename std::enable_if<
                     is_effective_t<M, element_of_t<T>>::value>::type* = nullptr
 #endif
@@ -254,6 +258,7 @@ namespace util {
             struct tuple_like_remapper<strategy_remap_tag, M, Base<OldArgs...>
 #ifdef HPX_HAVE_EXPRESSION_SFINAE
                 ,
+                // Support for skipping completely untouched types
                 typename std::enable_if<
                     is_effective_any_of_t<M, OldArgs...>::value>::type
 #endif
@@ -275,6 +280,7 @@ namespace util {
                 Base<OldArgs...>
 #ifdef HPX_HAVE_EXPRESSION_SFINAE
                 ,
+                // Support for skipping completely untouched types
                 typename std::enable_if<
                     is_effective_any_of_t<M, OldArgs...>::value>::type
 #endif
@@ -299,6 +305,7 @@ namespace util {
             struct tuple_like_remapper<strategy_remap_tag, M, Base<OldArg, Size>
 #ifdef HPX_HAVE_EXPRESSION_SFINAE
                 ,
+                // Support for skipping completely untouched types
                 typename std::enable_if<is_effective_t<M, OldArg>::value>::type
 #endif
                 >
@@ -319,6 +326,7 @@ namespace util {
                 Base<OldArg, Size>
 #ifdef HPX_HAVE_EXPRESSION_SFINAE
                 ,
+                // Support for skipping completely untouched types
                 typename std::enable_if<is_effective_t<M, OldArg>::value>::type
 #endif
                 >
@@ -623,6 +631,15 @@ namespace util {
 
     /// Remaps the pack with the given mapper.
     ///
+    ///   ```cpp
+    ///   auto add = [](int left, int right) {
+    ///       return left + right;
+    ///   };
+    ///   auto unwrapper = hpx:util:::unwrapped(add);
+    ///   hpx::util::tuple<hpx::future<int>, hpx::future<int>> tuple = ...;
+    ///   int result = unwrapper(tuple);
+    ///   ```
+    ///
     /// TODO Detailed doc
     template <typename Mapper, typename... T>
     auto remap_pack(Mapper&& mapper, T&&... pack)
@@ -750,11 +767,10 @@ static void testTraversal()
 
 struct my_unwrapper
 {
-    // TODO future return value
-    // future traits.hpp type (result type)
     template <typename T,
         typename std::enable_if<traits::is_future<T>::value>::type* = nullptr>
-    auto operator()(T future) const -> decltype(std::declval<T>().get())
+    auto operator()(T future) const ->
+        typename traits::future_traits<T>::result_type
     {
         return future.get();
     }
