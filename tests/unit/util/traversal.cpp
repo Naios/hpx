@@ -671,7 +671,7 @@ struct all_map
         return 0;
     }
 };
-/*
+
 static void testTraversal()
 {
     {
@@ -749,8 +749,7 @@ static void testTraversal()
 
     return;
 }
-*/
-/*
+
 struct my_unwrapper
 {
     // TODO future return value
@@ -853,12 +852,6 @@ struct mytester
         return 0;
     }
 };
-*/
-
-/*
-                typename std::enable_if<is_effective_any_of_t<Mapper,
-                    OldArgs...>::value>::type* = nullptr
- */
 
 struct my_int_mapper
 {
@@ -872,7 +865,7 @@ struct my_int_mapper
 
 static void testFallThrough()
 {
-    /*traverse_pack(my_int_mapper{}, int(0),
+    traverse_pack(my_int_mapper{}, int(0),
         std::vector<hpx::util::tuple<float, float>>{
             hpx::util::make_tuple(1.f, 2.f)},
         hpx::util::make_tuple(std::vector<float>{1.f, 2.f}));
@@ -883,7 +876,7 @@ static void testFallThrough()
 
     auto res1 = remap_pack(my_int_mapper{}, int(0),
         std::vector<std::vector<float>>{{1.f, 2.f}},
-        hpx::util::make_tuple(77.f, 2));*/
+        hpx::util::make_tuple(77.f, 2));
 
     auto res2 = remap_pack(
         [](int i) {
@@ -899,9 +892,9 @@ static void testFallThrough()
 
 int main(int argc, char* argv[])
 {
-    // testTraversal();
-    // testEarlyUnwrapped();
-    // testContainerRemap();
+    testTraversal();
+    testEarlyUnwrapped();
+    testContainerRemap();
     testFallThrough();
 
     auto result = hpx::util::report_errors();
