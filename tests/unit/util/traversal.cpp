@@ -44,7 +44,7 @@ namespace util {
         /// call to the mapper.
         template <typename Mapper, typename T>
         using is_effective_t =
-            typename traits::is_invocable<typename Mapper::traversor_type,
+            traits::is_invocable<typename Mapper::traversor_type,
                 T>::value;
 
         /// Deduces to a true type if any type leads to at least one effective
