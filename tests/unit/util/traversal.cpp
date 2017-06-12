@@ -36,11 +36,17 @@ namespace util {
         {
         };
 
+        template <bool Value>
+        struct requires_true : std::integral_constant<bool, Value>
+        {
+            static_assert(Value, "Failed!");
+        };
+
         /// Deduces to a true type if the type leads to at least one effective
         /// call to the mapper.
         template <typename Mapper, typename T>
-        using is_effective_t =
-            traits::is_invocable<typename Mapper::traversor_type, T>;
+        using is_effective_t = requires_true<
+            traits::is_invocable<typename Mapper::traversor_type, T>::value>;
 
         /// Deduces to a true type if any type leads to at least one effective
         /// call to the mapper.
@@ -385,8 +391,8 @@ namespace util {
 
                 /// SFINAE helper
                 template <typename T>
-                auto operator()(T&& element)
-                    -> decltype(this->get_helper()->traverse(
+                auto operator()(T&& element) -> decltype(
+                    std::declval<traversor>().get_helper()->traverse(
                         Strategy{}, std::forward<T>(element)));
 
                 /// An alias to this type
@@ -405,8 +411,8 @@ namespace util {
                 using traversal_callable_base::traversal_callable_base;
 
                 template <typename T>
-                auto operator()(T&& element)
-                    -> decltype(this->get_helper()->try_traverse(
+                auto operator()(T&& element) -> decltype(
+                    std::declval<try_traversor>().get_helper()->try_traverse(
                         Strategy{}, std::forward<T>(element)))
                 {
                     return this->get_helper()->try_traverse(
@@ -420,7 +426,8 @@ namespace util {
             /// Invokes the real mapper with the given element
             template <typename T>
             auto invoke(T&& element)
-                -> decltype(mapper_(std::forward<T>(element)))
+                -> decltype(std::declval<mapping_helper>().mapper_(
+                    std::forward<T>(element)))
             {
                 return mapper_(std::forward<T>(element));
             }
@@ -433,7 +440,8 @@ namespace util {
             /// before matching the tag, which leads to build failures.
             template <typename T>
             auto match(container_match_tag<false, false>, T&& element)
-                -> decltype(invoke(std::forward<T>(element)));
+                -> decltype(std::declval<mapping_helper>().invoke(
+                    std::forward<T>(element)));
 
             /// SFINAE helper for elements satisfying the container
             /// requirements, which are not tuple like.
@@ -459,7 +467,7 @@ namespace util {
             /// with the minimal needed set of accepted arguments.
             /*template <typename MatcherTag, typename T>
             auto try_match(MatcherTag, T&& element)
-                -> decltype(this->may_void(std::forward<T>(element)))
+                -> decltype(std::declval<mapping_helper>().may_void(std::forward<T>(element)))
             {
                 return this->may_void(std::forward<T>(element));
             }*/
@@ -472,7 +480,8 @@ namespace util {
             /// before matching the tag, which leads to build failures.
             template <typename T>
             auto try_match(container_match_tag<false, false>, T&& element)
-                -> decltype(invoke(std::forward<T>(element)))
+                -> decltype(std::declval<mapping_helper>().invoke(
+                    std::forward<T>(element)))
             {
                 // T could be any non container or non tuple like type here,
                 // take int or hpx::future<int> as an example.
@@ -493,7 +502,7 @@ namespace util {
             /// Match elements which are tuple like and that also may
             /// satisfy the container requirements
             /// -> We match tuple like types over container like ones
-            template <bool IsContainer, typename T>
+            /*template <bool IsContainer, typename T>
             auto try_match(
                 container_match_tag<IsContainer, true>, T&& tuple_like)
                 -> decltype(tuple_like_remapping::remap(Strategy{},
@@ -501,7 +510,7 @@ namespace util {
             {
                 return tuple_like_remapping::remap(Strategy{},
                     std::forward<T>(tuple_like), try_traversor{this});
-            }
+            }*/
 
         public:
             explicit mapping_helper(M mapper)
@@ -514,15 +523,16 @@ namespace util {
             /// SFINAE helper: Doesn't allow routing through elements,
             /// that aren't accepted by the mapper
             template <typename T>
-            auto traverse(Strategy, T&& element) -> decltype(this->match(
-                std::declval<
-                    container_match_of<typename std::decay<T>::type>>(),
-                std::declval<T>()));
+            auto traverse(Strategy, T&& element)
+                -> decltype(std::declval<mapping_helper>().match(
+                    std::declval<
+                        container_match_of<typename std::decay<T>::type>>(),
+                    std::declval<T>()));
 
             /// \copybrief traverse
             template <typename T>
             auto try_traverse(Strategy, T&& element)
-                -> decltype(this->try_match(
+                -> decltype(std::declval<mapping_helper>().try_match(
                     std::declval<
                         container_match_of<typename std::decay<T>::type>>(),
                     std::declval<T>()))
@@ -716,6 +726,8 @@ static void testTraversal()
 /*
 struct my_unwrapper
 {
+    // TODO future return value
+    // future traits.hpp type (result type)
     template <typename T,
         typename std::enable_if<traits::is_future<T>::value>::type* = nullptr>
     auto operator()(T future) const -> decltype(std::declval<T>().get())
@@ -846,14 +858,14 @@ static void testFallThrough()
         std::vector<std::vector<float>>{{1.f, 2.f}},
         hpx::util::make_tuple(77.f, 2));*/
 
-    auto match = container_match_of<std::vector<int>>{};
-
     auto res2 = remap_pack(
-        [](auto i) {
+        [](int i) {
             // ...
             return 0;
         },
-        0, std::vector<std::vector<int>>{{1, 2}});
+        0, std::vector<int>{1, 2});
+
+    // hpx::util::make_tuple(strategy_traverse_tag{}),
 
     int i = 0;
 }
