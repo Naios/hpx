@@ -799,10 +799,9 @@ struct my_allocator : public std::allocator<T>
 
 static void testContainerRemap()
 {
-    using namespace container_remapping;
-
     // Traits
     {
+        using namespace container_remapping;
         HPX_TEST_EQ((has_push_back<std::vector<int>, int>::value), true);
         HPX_TEST_EQ((has_push_back<int, int>::value), false);
     }
@@ -816,8 +815,7 @@ static void testContainerRemap()
         // Rebinds the values
         {
             std::vector<unsigned short> source = {1, 2, 3};
-            std::vector<unsigned long> dest =
-                remap(strategy_remap_tag{}, source, remapper);
+            std::vector<unsigned long> dest = remap_pack(remapper, source);
 
             HPX_TEST((dest == decltype(dest){0, 1, 2}));
         }
