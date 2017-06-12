@@ -457,12 +457,12 @@ namespace util {
             /// since it's the least concrete one.
             /// This works recursively, so we only call the mapper
             /// with the minimal needed set of accepted arguments.
-            template <typename MatcherTag, typename T>
+            /*template <typename MatcherTag, typename T>
             auto try_match(MatcherTag, T&& element)
                 -> decltype(this->may_void(std::forward<T>(element)))
             {
                 return this->may_void(std::forward<T>(element));
-            }
+            }*/
 
             /// Match plain elements not satisfying the tuple like or
             /// container requirements.
@@ -634,7 +634,7 @@ struct all_map
         return 0;
     }
 };
-
+/*
 static void testTraversal()
 {
     {
@@ -661,18 +661,19 @@ static void testTraversal()
     }
 
     {
-        // Mainly a broken build regression test
+        // Broken build regression tests:
         traverse_pack(my_mapper{}, int(0), 1.f);
 
         remap_pack(all_map{}, 0, std::vector<int>{1, 2});
     }
 
     {
+        // Also a regression test
         auto res = remap_pack(all_map{}, std::vector<std::vector<int>>{{1, 2}});
         HPX_TEST_EQ((res[0][0]), (0));
     }
 
-    /*
+    
     {
         auto res = remap_pack(my_mapper{},
             0,
@@ -707,11 +708,11 @@ static void testTraversal()
                 2, 3, std::vector<std::vector<int>>{{4, 5}, {6, 7}}));
 
         HPX_TEST_EQ((count), (7));
-    }*/
+    }
 
     return;
 }
-
+*/
 /*
 struct my_unwrapper
 {
