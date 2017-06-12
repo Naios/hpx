@@ -23,6 +23,10 @@
 #include <algorithm>
 #include <vector>
 
+#ifndef _WIN32
+#define HPX_HAVE_EXPRESSION_SFINAE
+#endif
+
 namespace hpx {
 namespace util {
     namespace detail {
@@ -36,17 +40,11 @@ namespace util {
         {
         };
 
-        template <bool Value>
-        struct requires_true : std::integral_constant<bool, Value>
-        {
-            static_assert(Value, "Failed!");
-        };
-
         /// Deduces to a true type if the type leads to at least one effective
         /// call to the mapper.
         template <typename Mapper, typename T>
-        using is_effective_t = requires_true<
-            traits::is_invocable<typename Mapper::traversor_type, T>::value>;
+        using is_effective_t =
+            traits::is_invocable<typename Mapper::traversor_type, T>::value;
 
         /// Deduces to a true type if any type leads to at least one effective
         /// call to the mapper.
@@ -180,9 +178,13 @@ namespace util {
             /// Remaps the content of the given container with type T,
             /// to a container of the same type which may contain
             /// different types.
-            template <typename T, typename M,
+            template <typename T, typename M
+#ifdef HPX_HAVE_EXPRESSION_SFINAE
+                ,
                 typename std::enable_if<
-                    is_effective_t<M, element_of_t<T>>::value>::type* = nullptr>
+                    is_effective_t<M, element_of_t<T>>::value>::type* = nullptr
+#endif
+                >
             auto remap(strategy_remap_tag, T&& container, M&& mapper)
                 -> decltype(
                     rebind_container<mapped_type_from_t<T, M>>(container))
@@ -217,9 +219,13 @@ namespace util {
             }
 
             /// Just call the visitor with the content of the container
-            template <typename T, typename M,
+            template <typename T, typename M
+#ifdef HPX_HAVE_EXPRESSION_SFINAE
+                ,
                 typename std::enable_if<
-                    is_effective_t<M, element_of_t<T>>::value>::type* = nullptr>
+                    is_effective_t<M, element_of_t<T>>::value>::type* = nullptr
+#endif
+                >
             void remap(strategy_traverse_tag, T&& container, M&& mapper)
             {
                 for (auto&& element : std::forward<T>(container))
@@ -233,17 +239,25 @@ namespace util {
         /// Provides utilities for remapping the whole content of a
         /// tuple like type to the same type holding different types.
         namespace tuple_like_remapping {
-            template <typename Strategy, typename Mapper, typename T,
-                typename = void>
+            template <typename Strategy, typename Mapper, typename T
+#ifdef HPX_HAVE_EXPRESSION_SFINAE
+                ,
+                typename = void
+#endif
+                >
             struct tuple_like_remapper;
 
             /// Specialization for std::tuple like types which contain
             /// an arbitrary amount of heterogenous arguments.
             template <typename M, template <class...> class Base,
                 typename... OldArgs>
-            struct tuple_like_remapper<strategy_remap_tag, M, Base<OldArgs...>,
+            struct tuple_like_remapper<strategy_remap_tag, M, Base<OldArgs...>
+#ifdef HPX_HAVE_EXPRESSION_SFINAE
+                ,
                 typename std::enable_if<
-                    is_effective_any_of_t<M, OldArgs...>::value>::type>
+                    is_effective_any_of_t<M, OldArgs...>::value>::type
+#endif
+                >
             {
                 M mapper_;
 
@@ -258,9 +272,13 @@ namespace util {
             template <typename M, template <class...> class Base,
                 typename... OldArgs>
             struct tuple_like_remapper<strategy_traverse_tag, M,
-                Base<OldArgs...>,
+                Base<OldArgs...>
+#ifdef HPX_HAVE_EXPRESSION_SFINAE
+                ,
                 typename std::enable_if<
-                    is_effective_any_of_t<M, OldArgs...>::value>::type>
+                    is_effective_any_of_t<M, OldArgs...>::value>::type
+#endif
+                >
             {
                 M mapper_;
 
@@ -278,9 +296,12 @@ namespace util {
             /// compile-time known amount of homogeneous types.
             template <typename M, template <class, std::size_t> class Base,
                 typename OldArg, std::size_t Size>
-            struct tuple_like_remapper<strategy_remap_tag, M,
-                Base<OldArg, Size>,
-                typename std::enable_if<is_effective_t<M, OldArg>::value>::type>
+            struct tuple_like_remapper<strategy_remap_tag, M, Base<OldArg, Size>
+#ifdef HPX_HAVE_EXPRESSION_SFINAE
+                ,
+                typename std::enable_if<is_effective_t<M, OldArg>::value>::type
+#endif
+                >
             {
                 M mapper_;
 
@@ -295,8 +316,12 @@ namespace util {
             template <typename M, template <class, std::size_t> class Base,
                 typename OldArg, std::size_t Size>
             struct tuple_like_remapper<strategy_traverse_tag, M,
-                Base<OldArg, Size>,
-                typename std::enable_if<is_effective_t<M, OldArg>::value>::type>
+                Base<OldArg, Size>
+#ifdef HPX_HAVE_EXPRESSION_SFINAE
+                ,
+                typename std::enable_if<is_effective_t<M, OldArg>::value>::type
+#endif
+                >
             {
                 M mapper_;
 
@@ -465,12 +490,13 @@ namespace util {
             /// since it's the least concrete one.
             /// This works recursively, so we only call the mapper
             /// with the minimal needed set of accepted arguments.
-            /*template <typename MatcherTag, typename T>
+            template <typename MatcherTag, typename T>
             auto try_match(MatcherTag, T&& element)
-                -> decltype(std::declval<mapping_helper>().may_void(std::forward<T>(element)))
+                -> decltype(std::declval<mapping_helper>().may_void(
+                    std::forward<T>(element)))
             {
                 return this->may_void(std::forward<T>(element));
-            }*/
+            }
 
             /// Match plain elements not satisfying the tuple like or
             /// container requirements.
@@ -502,7 +528,7 @@ namespace util {
             /// Match elements which are tuple like and that also may
             /// satisfy the container requirements
             /// -> We match tuple like types over container like ones
-            /*template <bool IsContainer, typename T>
+            template <bool IsContainer, typename T>
             auto try_match(
                 container_match_tag<IsContainer, true>, T&& tuple_like)
                 -> decltype(tuple_like_remapping::remap(Strategy{},
@@ -510,7 +536,7 @@ namespace util {
             {
                 return tuple_like_remapping::remap(Strategy{},
                     std::forward<T>(tuple_like), try_traversor{this});
-            }*/
+            }
 
         public:
             explicit mapping_helper(M mapper)
@@ -863,7 +889,7 @@ static void testFallThrough()
             // ...
             return 0;
         },
-        0, std::vector<int>{1, 2});
+        1, std::vector<int>{2, 3});
 
     // hpx::util::make_tuple(strategy_traverse_tag{}),
 
