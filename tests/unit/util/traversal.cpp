@@ -3,7 +3,6 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <algorithm>
 #include <type_traits>
 #include <utility>
 
@@ -214,10 +213,13 @@ namespace util {
 
                 // Perform the actual value remapping from the source to
                 // the destination.
-                std::transform(std::forward<T>(container).begin(),
-                    std::forward<T>(container).end(),
-                    std::back_inserter(remapped),
-                    std::forward<M>(mapper));
+                // We could have used std::transform for this, however,
+                // I didn't want to pull a whole header for it in.
+                for (auto&& val : std::forward<T>(container))
+                {
+                    remapped.push_back(std::forward<M>(mapper)(
+                        std::forward<decltype(val)>(val)));
+                }
 
                 return remapped;    // RVO
             }
@@ -547,12 +549,6 @@ namespace util {
                     std::forward<T>(tuple_like), try_traversor{this});
             }
 
-        public:
-            explicit mapping_helper(M mapper)
-              : mapper_(std::move(mapper))
-            {
-            }
-
             /// Traverses a single element.
             ///
             /// SFINAE helper: Doesn't allow routing through elements,
@@ -578,6 +574,12 @@ namespace util {
                 return try_match(
                     container_match_of<typename std::decay<T>::type>{},
                     std::forward<T>(element));
+            }
+
+        public:
+            explicit mapping_helper(M mapper)
+              : mapper_(std::move(mapper))
+            {
             }
 
             /// \copybrief try_traverse
