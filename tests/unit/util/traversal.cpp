@@ -668,7 +668,7 @@ namespace util {
         }
     }    // end namespace detail
 
-    /// Remaps the pack with the given mapper.
+    /// Maps the pack with the given mapper.
     ///
     /// This function tries to visit all plain elements which may be wrapped in:
     /// - homogeneous containers (std::vector, std::list)
@@ -680,25 +680,28 @@ namespace util {
     /// and preserved through the hierarchy.
     ///
     ///   ```cpp
-    ///   auto add = [](int left, int right) {
+    ///   // Maps all ints to floats
+    ///   auto to_float = [](int left) {
     ///       return left + right;
     ///   };
-    ///   auto unwrapper = hpx:util:::unwrapped(add);
-    ///   hpx::util::tuple<hpx::future<int>, hpx::future<int>> tuple = ...;
-    ///   int result = unwrapper(tuple);
+    ///   map_pack(to_float,
+    ///            1, hpx::util::make_tuple(2, std::vector<int>{3, 4}), 5);
     ///   ```
     ///
-    /// \param mapper A callable object, which accept an arbitrary type and maps
-    ///               it to another or the same type.
+    /// \throws       std::exception like objects which are thrown by an
+    ///               invocation to the mapper.
+    ///
+    /// \param mapper A callable object, which accept an arbitrary type
+    ///               and maps it to another type or the same one.
     ///
     /// \param pack   An arbitrary variadic pack which may contain any type.
     ///
-    /// \return       Returns the mapped element or in case the pack contains
+    /// \returns      The mapped element or in case the pack contains
     ///               multiple elements, the pack is wrapped into
     ///               a hpx::util::tuple.
     ///
     template <typename Mapper, typename... T>
-    auto remap_pack(Mapper&& mapper, T&&... pack)
+    auto map_pack(Mapper&& mapper, T&&... pack)
         -> decltype(detail::apply_pack_transform(detail::strategy_remap_tag{},
             std::forward<Mapper>(mapper),
             std::forward<T>(pack)...))
@@ -710,10 +713,10 @@ namespace util {
 
     /// Traverses the pack with the given visitor.
     ///
-    /// This function works in the same way as remap_pack,
+    /// This function works in the same way as map_pack,
     /// however, the result of the mapper isn't preserved.
     ///
-    /// See remap_pack for a detailed description.
+    /// See map_pack for a detailed description.
     template <typename Mapper, typename... T>
     void traverse_pack(Mapper&& mapper, T&&... pack)
     {
@@ -721,8 +724,8 @@ namespace util {
             std::forward<Mapper>(mapper),
             std::forward<T>(pack)...);
     }
-}    // namespace util
-}    // namespace hpx
+}    // end namespace util
+}    // end namespace hpx
 
 // TODO Fix this (as described above)
 #undef HPX_HAVE_EXPRESSION_SFINAE
@@ -753,7 +756,7 @@ struct all_map
 static void testTraversal()
 {
     {
-        auto res = remap_pack([](auto el) -> float { return float(el + 1.f); },
+        auto res = map_pack([](auto el) -> float { return float(el + 1.f); },
             0,
             1.f,
             hpx::util::make_tuple(1.f, 3),
@@ -779,17 +782,17 @@ static void testTraversal()
         // Broken build regression tests:
         traverse_pack(my_mapper{}, int(0), 1.f);
 
-        remap_pack(all_map{}, 0, std::vector<int>{1, 2});
+        map_pack(all_map{}, 0, std::vector<int>{1, 2});
     }
 
     {
         // Also a regression test
-        auto res = remap_pack(all_map{}, std::vector<std::vector<int>>{{1, 2}});
+        auto res = map_pack(all_map{}, std::vector<std::vector<int>>{{1, 2}});
         HPX_TEST_EQ((res[0][0]), (0));
     }
 
     {
-        auto res = remap_pack(my_mapper{},
+        auto res = map_pack(my_mapper{},
             0,
             1.f,
             hpx::util::make_tuple(1.f, 3,
@@ -843,7 +846,7 @@ static void testEarlyUnwrapped()
     using namespace hpx::lcos;
 
     {
-        auto res = remap_pack(my_unwrapper{},    // ...
+        auto res = map_pack(my_unwrapper{},    // ...
             0, 1, make_ready_future(3),
             make_tuple(make_ready_future(4), make_ready_future(5)));
 
@@ -893,7 +896,7 @@ static void testContainerRemap()
         // Rebinds the values
         {
             std::vector<unsigned short> source = {1, 2, 3};
-            std::vector<unsigned long> dest = remap_pack(remapper, source);
+            std::vector<unsigned long> dest = map_pack(remapper, source);
 
             HPX_TEST((dest == decltype(dest){0, 1, 2}));
         }
@@ -948,11 +951,11 @@ static void testFallThrough()
         std::vector<std::vector<float>>{{1.f, 2.f}},
         hpx::util::make_tuple(1.f, 2.f));
 
-    auto res1 = remap_pack(my_int_mapper{}, int(0),
+    auto res1 = map_pack(my_int_mapper{}, int(0),
         std::vector<std::vector<float>>{{1.f, 2.f}},
         hpx::util::make_tuple(77.f, 2));
 
-    auto res2 = remap_pack(
+    auto res2 = map_pack(
         [](int i) {
             // ...
             return 0;
