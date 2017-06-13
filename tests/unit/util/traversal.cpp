@@ -177,69 +177,96 @@ namespace util {
             using mapped_type_from_t =
                 typename invoke_result<Mapping, element_of_t<Container>>::type;
 
+            template <typename Strategy, typename Mapper, typename SourceType,
+                typename TargetType
+#ifdef HPX_HAVE_EXPRESSION_SFINAE
+                ,
+                typename = void
+#endif
+                >
+            struct container_remapper;
+
             /// Remaps the content of the given container with type T,
             /// to a container of the same type which may contain
             /// different types.
-            template <typename T, typename M
+            template <typename Mapper, typename SourceType, typename TargetType>
+            struct container_remapper<strategy_remap_tag, Mapper, SourceType,
+                TargetType
 #ifdef HPX_HAVE_EXPRESSION_SFINAE
                 ,
                 // Support for skipping completely untouched types
                 typename std::enable_if<
-                    is_effective_t<M, element_of_t<T>>::value>::type* = nullptr
+                    is_effective_t<Mapper, SourceType>::value>::type
 #endif
                 >
-            auto remap(strategy_remap_tag, T&& container, M&& mapper)
-                -> decltype(
-                    rebind_container<mapped_type_from_t<T, M>>(container))
             {
-                // TODO Maybe optimize this for the case where we map to the
-                // same type, so we don't create a whole new container for
-                // that case.
-
-                static_assert(has_push_back<typename std::decay<T>::type,
-                                  element_of_t<T>>::value,
-                    "Can only remap containers, that provide a push_back "
-                    "method!");
-
-                // Create the new container, which is capable of holding
-                // the remappped types.
-                using mapped = mapped_type_from_t<T, M>;
-                auto remapped = rebind_container<mapped>(container);
-
-                // We try to reserve the original size from the source
-                // container to the destination container.
-                reserve_if_possible(
-                    is_reservable<decltype(remapped)>{}, remapped, container);
-
-                // Perform the actual value remapping from the source to
-                // the destination.
-                // We could have used std::transform for this, however,
-                // I didn't want to pull a whole header for it in.
-                for (auto&& val : std::forward<T>(container))
+                template <typename M, typename T>
+                auto operator()(M&& mapper, T&& container) -> decltype(
+                    rebind_container<mapped_type_from_t<T, M>>(container))
                 {
-                    remapped.push_back(std::forward<M>(mapper)(
-                        std::forward<decltype(val)>(val)));
-                }
+                    static_assert(has_push_back<typename std::decay<T>::type,
+                                      element_of_t<T>>::value,
+                        "Can only remap containers, that provide a push_back "
+                        "method!");
 
-                return remapped;    // RVO
-            }
+                    // Create the new container, which is capable of holding
+                    // the remappped types.
+                    using mapped = mapped_type_from_t<T, M>;
+                    auto remapped = rebind_container<mapped>(container);
+
+                    // We try to reserve the original size from the source
+                    // container to the destination container.
+                    reserve_if_possible(is_reservable<decltype(remapped)>{},
+                        remapped, container);
+
+                    // Perform the actual value remapping from the source to
+                    // the destination.
+                    // We could have used std::transform for this, however,
+                    // I didn't want to pull a whole header for it in.
+                    for (auto&& val : std::forward<T>(container))
+                    {
+                        remapped.push_back(std::forward<M>(mapper)(
+                            std::forward<decltype(val)>(val)));
+                    }
+
+                    return remapped;    // RVO
+                }
+            };
 
             /// Just call the visitor with the content of the container
-            template <typename T, typename M
+            template <typename Mapper, typename SourceType, typename TargetType>
+            struct container_remapper<strategy_traverse_tag, Mapper, SourceType,
+                TargetType
 #ifdef HPX_HAVE_EXPRESSION_SFINAE
                 ,
                 // Support for skipping completely untouched types
                 typename std::enable_if<
-                    is_effective_t<M, element_of_t<T>>::value>::type* = nullptr
+                    is_effective_t<Mapper, SourceType>::value>::type
 #endif
                 >
-            void remap(strategy_traverse_tag, T&& container, M&& mapper)
             {
-                for (auto&& element : std::forward<T>(container))
+                template <typename M, typename T>
+                void operator()(M&& mapper, T&& container)
                 {
-                    std::forward<M>(mapper)(
-                        std::forward<decltype(element)>(element));
+                    for (auto&& element : std::forward<T>(container))
+                    {
+                        std::forward<M>(mapper)(
+                            std::forward<decltype(element)>(element));
+                    }
                 }
+            };
+
+            template <typename Strategy, typename T, typename M>
+            auto remap(Strategy, T&& container, M&& mapper)
+                -> decltype(std::declval<container_remapper<Strategy, M,
+                        element_of_t<T>, mapped_type_from_t<T, M>>>()(
+                    std::forward<M>(mapper), std::forward<T>(container)))
+            {
+                container_remapper<Strategy, M, element_of_t<T>,
+                    mapped_type_from_t<T, M>>
+                    remapper;
+                return remapper(
+                    std::forward<M>(mapper), std::forward<T>(container));
             }
         }    // end namespace container_remapping
 
