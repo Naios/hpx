@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <type_traits>
+#include <utility>
 
 #include <hpx/config.hpp>
 #include <hpx/traits/is_callable.hpp>
@@ -585,9 +586,6 @@ namespace util {
                 -> decltype(std::declval<mapping_helper>().try_traverse(
                     strategy, std::declval<T>()))
             {
-                // We use tag dispatching here, to categorize the type T whether
-                // it satisfies the container or tuple like requirements.
-                // Then we can choose the underlying implementation accordingly.
                 return try_traverse(strategy, std::forward<T>(element));
             }
 
