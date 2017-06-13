@@ -200,19 +200,19 @@ namespace util {
 #endif
                 >
             {
+                /// We create a new container, which may hold the resulting type
                 template <typename M, typename T>
-                auto operator()(M&& mapper, T&& container) -> decltype(
-                    rebind_container<mapped_type_from_t<T, M>>(container))
+                auto apply(std::false_type, M&& mapper, T&& container) const
+                    -> decltype(rebind_container<TargetType>(container))
                 {
                     static_assert(has_push_back<typename std::decay<T>::type,
-                                      element_of_t<T>>::value,
+                                      SourceType>::value,
                         "Can only remap containers, that provide a push_back "
                         "method!");
 
                     // Create the new container, which is capable of holding
                     // the remappped types.
-                    using mapped = mapped_type_from_t<T, M>;
-                    auto remapped = rebind_container<mapped>(container);
+                    auto remapped = rebind_container<TargetType>(container);
 
                     // We try to reserve the original size from the source
                     // container to the destination container.
@@ -230,6 +230,35 @@ namespace util {
                     }
 
                     return remapped;    // RVO
+                }
+
+                /// The remapper optimized for the case that we map to the same
+                /// type we accepted such as int -> int.
+                template <typename M, typename T>
+                auto apply(std::true_type, M&& mapper, T&& container) const ->
+                    typename std::decay<T>::type
+                {
+                    for (auto&& val : std::forward<T>(container))
+                    {
+                        val = std::forward<M>(mapper)(
+                            std::forward<decltype(val)>(val));
+                    }
+                    return std::forward<T>(container);
+                }
+
+                /// We are allowed to reuse the container if we map to the same
+                /// type we are accepting and when we have
+                /// the full ownership of the container.
+                template <typename T>
+                using can_reuse = std::integral_constant<bool,
+                    std::is_same<SourceType, TargetType>::value &&
+                        std::is_rvalue_reference<T&&>::value>;
+
+                template <typename M, typename T>
+                auto operator()(M&& mapper, T&& container)
+                {
+                    return apply(can_reuse<T>{}, std::forward<M>(mapper),
+                        std::forward<T>(container));
                 }
             };
 
@@ -259,11 +288,13 @@ namespace util {
             template <typename Strategy, typename T, typename M>
             auto remap(Strategy, T&& container, M&& mapper)
                 -> decltype(std::declval<container_remapper<Strategy, M,
-                        element_of_t<T>, mapped_type_from_t<T, M>>>()(
+                        typename std::decay<element_of_t<T>>::type,
+                        typename std::decay<mapped_type_from_t<T, M>>::type>>()(
                     std::forward<M>(mapper), std::forward<T>(container)))
             {
-                container_remapper<Strategy, M, element_of_t<T>,
-                    mapped_type_from_t<T, M>>
+                container_remapper<Strategy, M,
+                    typename std::decay<element_of_t<T>>::type,
+                    typename std::decay<mapped_type_from_t<T, M>>::type>
                     remapper;
                 return remapper(
                     std::forward<M>(mapper), std::forward<T>(container));
