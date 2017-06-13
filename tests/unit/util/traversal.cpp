@@ -595,9 +595,12 @@ namespace util {
             auto init_traverse(strategy_remap_tag strategy, First&& first,
                 Second&& second, T&&... rest)
                 -> decltype(util::make_tuple(
-                    try_traverse(strategy, std::forward<First>(first)),
-                    try_traverse(strategy, std::forward<Second>(second)),
-                    try_traverse(strategy, std::forward<T>(rest))...))
+                    std::declval<mapping_helper>().try_traverse(
+                        strategy, std::forward<First>(first)),
+                    std::declval<mapping_helper>().try_traverse(
+                        strategy, std::forward<Second>(second)),
+                    std::declval<mapping_helper>().try_traverse(
+                        strategy, std::forward<T>(rest))...))
             {
                 return util::make_tuple(
                     try_traverse(strategy, std::forward<First>(first)),
