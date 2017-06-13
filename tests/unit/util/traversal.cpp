@@ -979,14 +979,5 @@ int main(int argc, char* argv[])
 
     auto result = hpx::util::report_errors();
 
-    /*auto testlm = [](int)
-    {
-        return 0;
-    };
-
-    std::true_type isc = traits::is_invocable<decltype(testlm), int>{};
-
-    std::true_type tt = is_effective_any_of_t<mytester, std::vector<int>, int>{};*/
-
     return result;
 }
