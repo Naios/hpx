@@ -26,9 +26,9 @@
 #include <vector>
 
 // TODO Find a better solution for this
-// #if !defined(HPX_MSVC)
-// #define HPX_HAVE_EXPRESSION_SFINAE
-// #endif
+#if !defined(HPX_MSVC)
+#define HPX_HAVE_EXPRESSION_SFINAE
+#endif
 
 namespace hpx {
 namespace util {
