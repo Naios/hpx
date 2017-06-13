@@ -670,6 +670,15 @@ namespace util {
 
     /// Remaps the pack with the given mapper.
     ///
+    /// This function tries to visit all plain elements which may be wrapped in:
+    /// - homogeneous containers (std::vector, std::list)
+    /// - heterogenous containers (hpx::util::tuple, std::pair, std::array)
+    /// and re-assembles the pack with the result of the mapper.
+    /// Mapping from one type to a different one is supported.
+    ///
+    /// Elements that aren't accepted by the mapper are routed through
+    /// and preserved through the hierarchy.
+    ///
     ///   ```cpp
     ///   auto add = [](int left, int right) {
     ///       return left + right;
@@ -679,7 +688,15 @@ namespace util {
     ///   int result = unwrapper(tuple);
     ///   ```
     ///
-    /// TODO Detailed doc
+    /// \param mapper A callable object, which accept an arbitrary type and maps
+    ///               it to another or the same type.
+    ///
+    /// \param pack   An arbitrary variadic pack which may contain any type.
+    ///
+    /// \return       Returns the mapped element or in case the pack contains
+    ///               multiple elements, the pack is wrapped into
+    ///               a hpx::util::tuple.
+    ///
     template <typename Mapper, typename... T>
     auto remap_pack(Mapper&& mapper, T&&... pack)
         -> decltype(detail::apply_pack_transform(detail::strategy_remap_tag{},
@@ -693,16 +710,22 @@ namespace util {
 
     /// Traverses the pack with the given visitor.
     ///
-    /// TODO Detailed doc
-    template <typename Visitor, typename... T>
-    void traverse_pack(Visitor&& visitor, T&&... pack)
+    /// This function works in the same way as remap_pack,
+    /// however, the result of the mapper isn't preserved.
+    ///
+    /// See remap_pack for a detailed description.
+    template <typename Mapper, typename... T>
+    void traverse_pack(Mapper&& mapper, T&&... pack)
     {
         detail::apply_pack_transform(detail::strategy_traverse_tag{},
-            std::forward<Visitor>(visitor),
+            std::forward<Mapper>(mapper),
             std::forward<T>(pack)...);
     }
 }    // namespace util
 }    // namespace hpx
+
+// TODO Fix this (as described above)
+#undef HPX_HAVE_EXPRESSION_SFINAE
 
 using namespace hpx;
 using namespace hpx::util;
