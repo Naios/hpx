@@ -681,8 +681,8 @@ namespace util {
     ///
     ///   ```cpp
     ///   // Maps all ints to floats
-    ///   auto to_float = [](int left) {
-    ///       return left + right;
+    ///   auto to_float = [](int value) {
+    ///       return float(value);
     ///   };
     ///   map_pack(to_float,
     ///            1, hpx::util::make_tuple(2, std::vector<int>{3, 4}), 5);
