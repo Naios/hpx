@@ -679,14 +679,13 @@ namespace util {
     /// Elements that aren't accepted by the mapper are routed through
     /// and preserved through the hierarchy.
     ///
-    ///   ```cpp
-    ///   // Maps all ints to floats
-    ///   auto to_float = [](int value) {
-    ///       return float(value);
-    ///   };
-    ///   map_pack(to_float,
-    ///            1, hpx::util::make_tuple(2, std::vector<int>{3, 4}), 5);
-    ///   ```
+    /// ```cpp
+    /// // Maps all ints to floats
+    /// map_pack([](int value) {
+    ///     return float(value);
+    /// },
+    /// 1, hpx::util::make_tuple(2, std::vector<int>{3, 4}), 5);
+    /// ```
     ///
     /// \throws       std::exception like objects which are thrown by an
     ///               invocation to the mapper.
