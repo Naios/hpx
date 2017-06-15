@@ -15,6 +15,15 @@ using namespace hpx;
 using namespace hpx::util;
 using namespace hpx::util::detail;
 
+struct all_map_float
+{
+    template <typename T>
+    float operator()(T el) const
+    {
+        return float(el + 1.f);
+    }
+};
+
 struct my_mapper
 {
     template <typename T,
@@ -34,10 +43,10 @@ struct all_map
     }
 };
 
-static void testTraversal()
+static void testMixedTraversal()
 {
     {
-        auto res = map_pack([](auto el) -> float { return float(el + 1.f); },
+        auto res = map_pack(all_map_float{},
             0,
             1.f,
             hpx::util::make_tuple(1.f, 3),
@@ -53,16 +62,14 @@ static void testTraversal()
             std::vector<std::vector<float>>{{2.f, 3.f}, {5.f, 6.f}},
             3.f);
 
-        //static_assert(std::is_same<decltype(res), decltype(expected)>::value,
-        //    "Type mismatch!");
-        int i = 0;
-        // HPX_TEST((res == expected));
+        static_assert(std::is_same<decltype(res), decltype(expected)>::value,
+            "Type mismatch!");
+        HPX_TEST((res == expected));
     }
 
     {
         // Broken build regression tests:
         traverse_pack(my_mapper{}, int(0), 1.f);
-
         map_pack(all_map{}, 0, std::vector<int>{1, 2});
     }
 
@@ -122,7 +129,7 @@ struct my_unwrapper
     }
 };
 
-static void testEarlyUnwrapped()
+static void testMixedEarlyUnwrapped()
 {
     using namespace hpx::lcos;
 
@@ -141,7 +148,7 @@ static void testEarlyUnwrapped()
 }
 
 template <typename T>
-struct my_allocator : public std::allocator<T>
+struct my_allocator : std::allocator<T>
 {
     unsigned state_;
 
@@ -159,7 +166,7 @@ struct my_allocator : public std::allocator<T>
     }
 };
 
-static void testContainerRemap()
+static void testMixedContainerRemap()
 {
     // Traits
     {
@@ -221,7 +228,7 @@ struct my_int_mapper
     }
 };
 
-static void testFallThrough()
+static void testMixedFallThrough()
 {
     traverse_pack(my_int_mapper{}, int(0),
         std::vector<hpx::util::tuple<float, float>>{
@@ -242,20 +249,60 @@ static void testFallThrough()
             return 0;
         },
         1, std::vector<int>{2, 3});
-
-    // hpx::util::make_tuple(strategy_traverse_tag{}),
-
-    int i = 0;
 }
 
-int main(int argc, char* argv[])
+static void testStrategicTraverse()
 {
-    testTraversal();
-    testEarlyUnwrapped();
-    testContainerRemap();
-    testFallThrough();
+    // Every element in the pack is visited
+    {}
 
-    auto result = hpx::util::report_errors();
+    // Elements accepted by the mapper aren't traversed
+    {}
 
-    return result;
+    // Remapping works across values
+    {}
+
+    // Remapping works across types
+    {
+    }
+}
+
+static void testStrategicContainerTraverse()
+{
+    // Every element in the container is visited
+    {}
+
+    // The container type itself is changed
+    {}
+
+    // Every element in the container is remapped
+    {
+    }
+}
+
+static void testStrategicTupleLikeTraverse()
+{
+    // Every element in the tuple like type is visited
+    {}
+
+    // The container tuple like type itself is changed
+    {}
+
+    // Every element in the tuple like type is remapped
+    {
+    }
+}
+
+int main(int, char**)
+{
+    testMixedTraversal();
+    testMixedEarlyUnwrapped();
+    testMixedContainerRemap();
+    testMixedFallThrough();
+
+    testStrategicTraverse();
+    testStrategicContainerTraverse();
+    testStrategicTupleLikeTraverse();
+
+    return hpx::util::report_errors();
 }
