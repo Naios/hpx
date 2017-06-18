@@ -9,6 +9,7 @@
 #include <hpx/util/lightweight_test.hpp>
 #include <hpx/util/pack_traversal.hpp>
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 using namespace hpx;
@@ -222,7 +223,7 @@ struct my_int_mapper
 {
     template <typename T,
         typename std::enable_if<std::is_same<T, int>::value>::type* = nullptr>
-    auto operator()(T el) const
+    float operator()(T el) const
     {
         return float(el + 1.f);
     }
@@ -244,25 +245,125 @@ static void testMixedFallThrough()
         hpx::util::make_tuple(77.f, 2));
 
     auto res2 = map_pack(
-        [](int i) {
+        [](int /*i*/) {
             // ...
             return 0;
         },
         1, std::vector<int>{2, 3});
 }
 
+class counter_mapper
+{
+    std::reference_wrapper<int> counter_;
+
+public:
+    explicit counter_mapper(int& counter)
+      : counter_(counter)
+    {
+    }
+
+    template <typename T>
+    void operator()(T el) const
+    {
+        ++counter_.get();
+    }
+};
+
+struct test_tag_1
+{
+};
+struct test_tag_2
+{
+};
+struct test_tag_3
+{
+};
+
+class counter_mapper_rejecting_non_tag_1
+{
+    std::reference_wrapper<int> counter_;
+
+public:
+    explicit counter_mapper_rejecting_non_tag_1(int& counter)
+      : counter_(counter)
+    {
+    }
+
+    void operator()(test_tag_1)
+    {
+        ++counter_.get();
+    }
+};
+
+class counter_mapper_rejecting_non_tag_1_sfinae
+{
+    std::reference_wrapper<int> counter_;
+
+public:
+    explicit counter_mapper_rejecting_non_tag_1_sfinae(int& counter)
+      : counter_(counter)
+    {
+    }
+
+    template <typename T,
+        typename std::enable_if<std::is_same<typename std::decay<T>::type,
+            test_tag_1>>::type* = nullptr>
+    void operator()(T)
+    {
+        ++counter_.get();
+    }
+};
+
 static void testStrategicTraverse()
 {
     // Every element in the pack is visited
-    {}
+    {
+        int counter = 0;
+        counter_mapper_rejecting_non_tag_1 mapper(counter);
+        traverse_pack(mapper, test_tag_1{}, test_tag_2{}, test_tag_3{});
+        HPX_TEST_EQ(counter, 3);
+    }
+
+    // Every element in the pack is visited from left to right
+    {
+        int counter = 0;
+        traverse_pack(
+            [&](int el) {
+                HPX_TEST_EQ(counter, el);
+                ++counter;
+            },
+            0, 1, 2, 3);
+        HPX_TEST_EQ(counter, 4);
+    }
 
     // Elements accepted by the mapper aren't traversed
-    {}
+    {
+        // Signature
+        int counter = 0;
+        counter_mapper_rejecting_non_tag_1 mapper1(counter);
+        traverse_pack(mapper1, test_tag_1{}, test_tag_2{}, test_tag_3{});
+        HPX_TEST_EQ(counter, 1);
+
+        // SFINAE
+        counter = 0;
+        counter_mapper_rejecting_non_tag_1_sfinae mapper2(counter);
+        traverse_pack(mapper2, test_tag_1{}, test_tag_2{}, test_tag_3{});
+        HPX_TEST_EQ(counter, 1);
+    }
 
     // Remapping works across values
     {}
 
     // Remapping works across types
+    {}
+
+    // Remapping works with move-only objects
+    {}
+
+    // Single object remapping returns the value
+    {}
+
+    // Remapping multiple objects returns the tuple of objects
     {
     }
 }
