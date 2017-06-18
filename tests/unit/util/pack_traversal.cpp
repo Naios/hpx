@@ -403,6 +403,8 @@ static void testStrategicTraverse()
         tuple<std::unique_ptr<unsigned>, std::unique_ptr<unsigned>,
             std::unique_ptr<unsigned>>
             res = map_pack(
+                // Since we pass the unique_ptr's as r-value,
+                // those should be passed as r-values to the mapper.
                 [](std::unique_ptr<int>&& ptr) {
                     // We explicitly move the ownership here
                     std::unique_ptr<int> owned = std::move(ptr);
@@ -415,16 +417,15 @@ static void testStrategicTraverse()
         HPX_TEST((!bool(p2)));
         HPX_TEST((!bool(p3)));
 
-        HPX_TEST_EQ((*get<0>(res)), 2);
-        HPX_TEST_EQ((*get<1>(res)), 3);
-        HPX_TEST_EQ((*get<2>(res)), 4);
+        HPX_TEST_EQ((*get<0>(res)), 2U);
+        HPX_TEST_EQ((*get<1>(res)), 3U);
+        HPX_TEST_EQ((*get<2>(res)), 4U);
     }
 
-    // Single object remapping returns the value
-    {}
-
-    // Remapping multiple objects returns the tuple of objects
+    // Single object remapping returns the value itself without any boxing
     {
+        int res = map_pack([](int i) { return i; }, 1);
+        HPX_TEST_EQ(res, 1);
     }
 }
 
