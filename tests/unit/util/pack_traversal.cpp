@@ -307,7 +307,7 @@ public:
 
     template <typename T,
         typename std::enable_if<std::is_same<typename std::decay<T>::type,
-            test_tag_1>>::type* = nullptr>
+            test_tag_1>::value>::type* = nullptr>
     void operator()(T)
     {
         ++counter_.get();
@@ -319,7 +319,7 @@ static void testStrategicTraverse()
     // Every element in the pack is visited
     {
         int counter = 0;
-        counter_mapper_rejecting_non_tag_1 mapper(counter);
+        counter_mapper mapper(counter);
         traverse_pack(mapper, test_tag_1{}, test_tag_2{}, test_tag_3{});
         HPX_TEST_EQ(counter, 3);
     }
@@ -336,18 +336,20 @@ static void testStrategicTraverse()
         HPX_TEST_EQ(counter, 4);
     }
 
-    // Elements accepted by the mapper aren't traversed
+    // Elements accepted by the mapper aren't traversed:
+    // - Signature
     {
-        // Signature
         int counter = 0;
-        counter_mapper_rejecting_non_tag_1 mapper1(counter);
-        traverse_pack(mapper1, test_tag_1{}, test_tag_2{}, test_tag_3{});
+        counter_mapper_rejecting_non_tag_1 mapper(counter);
+        traverse_pack(mapper, test_tag_1{}, test_tag_2{}, test_tag_3{});
         HPX_TEST_EQ(counter, 1);
+    }
 
-        // SFINAE
-        counter = 0;
-        counter_mapper_rejecting_non_tag_1_sfinae mapper2(counter);
-        traverse_pack(mapper2, test_tag_1{}, test_tag_2{}, test_tag_3{});
+    // - SFINAE
+    {
+        int counter = 0;
+        counter_mapper_rejecting_non_tag_1_sfinae mapper(counter);
+        traverse_pack(mapper, test_tag_1{}, test_tag_2{}, test_tag_3{});
         HPX_TEST_EQ(counter, 1);
     }
 
