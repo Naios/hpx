@@ -295,6 +295,29 @@ public:
     }
 };
 
+struct tag_shift_mapper
+{
+    test_tag_2 operator()(test_tag_1) const
+    {
+        return {};
+    }
+
+    test_tag_3 operator()(test_tag_2) const
+    {
+        return {};
+    }
+
+    test_tag_1 operator()(test_tag_3) const
+    {
+        return {};
+    }
+
+    float operator()(int) const
+    {
+        return 0.f;
+    }
+};
+
 class counter_mapper_rejecting_non_tag_1_sfinae
 {
     std::reference_wrapper<int> counter_;
@@ -354,13 +377,48 @@ static void testStrategicTraverse()
     }
 
     // Remapping works across values
-    {}
+    {
+        tuple<int, int, int> res =
+            map_pack([](int i) { return i + 1; }, 0, 1, 2);
+
+        auto expected = make_tuple(1, 2, 3);
+        HPX_TEST((res == expected));
+    }
 
     // Remapping works across types
-    {}
+    {
+        tag_shift_mapper mapper;
+        tuple<float, test_tag_2, test_tag_3, test_tag_1> res =
+            map_pack(mapper, 1, test_tag_1{}, test_tag_2{}, test_tag_3{});
+
+        HPX_TEST_EQ(get<0>(res), 0.f);
+    }
 
     // Remapping works with move-only objects
-    {}
+    {
+        std::unique_ptr<int> p1(new int(1));
+        std::unique_ptr<int> p2(new int(2));
+        std::unique_ptr<int> p3(new int(3));
+
+        tuple<std::unique_ptr<unsigned>, std::unique_ptr<unsigned>,
+            std::unique_ptr<unsigned>>
+            res = map_pack(
+                [](std::unique_ptr<int>&& ptr) {
+                    // We explicitly move the ownership here
+                    std::unique_ptr<int> owned = std::move(ptr);
+                    return std::unique_ptr<unsigned>(new unsigned(*owned + 1));
+                },
+                std::move(p1), std::move(p2), std::move(p3));
+
+        // We expect the ownership of p1 - p3 to be invalid
+        HPX_TEST((!bool(p1)));
+        HPX_TEST((!bool(p2)));
+        HPX_TEST((!bool(p3)));
+
+        HPX_TEST_EQ((*get<0>(res)), 2);
+        HPX_TEST_EQ((*get<1>(res)), 3);
+        HPX_TEST_EQ((*get<2>(res)), 4);
+    }
 
     // Single object remapping returns the value
     {}
