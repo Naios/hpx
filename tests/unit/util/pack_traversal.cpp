@@ -9,6 +9,7 @@
 #include <hpx/util/lightweight_test.hpp>
 #include <hpx/util/pack_traversal.hpp>
 #include <algorithm>
+#include <list>
 #include <memory>
 #include <vector>
 
@@ -458,6 +459,19 @@ static void testStrategicContainerTraverse()
         HPX_TEST_EQ(counter, 100);
     }
 
+    // Every element in the container is visited from left to right
+    {
+        int counter = 0;
+        traverse_pack(
+            [&](int el) {
+                HPX_TEST_EQ(counter, el);
+                ++counter;
+            },
+            std::vector<int>{0, 1},
+            std::vector<std::vector<int>>{{2, 3}, {4, 5}});
+        HPX_TEST_EQ(counter, 6);
+    }
+
     // The container type itself is changed
     // - Plain container
     {
@@ -485,16 +499,16 @@ static void testStrategicContainerTraverse()
 
     // - Nested container
     {
-        std::vector<std::vector<int>> container;
+        std::vector<std::list<int>> container;
         for (unsigned i = 0; i < 10; ++i)
         {
-            std::vector<int> nested(10, 1);
+            std::list<int> nested(10, 1);
             container.push_back(nested);
         }
 
         auto res = map_pack([](int i) { return 2; }, std::move(container));
         HPX_TEST((std::all_of(
-            res.begin(), res.end(), [](std::vector<int> const& nested) {
+            res.begin(), res.end(), [](std::list<int> const& nested) {
                 return std::all_of(
                     nested.begin(), nested.end(), [](int i) { return i == 2; });
             })));
@@ -504,13 +518,47 @@ static void testStrategicContainerTraverse()
 static void testStrategicTupleLikeTraverse()
 {
     // Every element in the tuple like type is visited
-    {}
+    {
+        int counter = 0;
+        counter_mapper mapper(counter);
+        traverse_pack(
+            mapper, make_tuple(test_tag_1{}, test_tag_2{}, test_tag_3{}));
+        HPX_TEST_EQ(counter, 3);
+    }
+
+    // Every element in the tuple like type is visited from left to right
+    {
+        int counter = 0;
+        traverse_pack(
+            [&](int el) {
+                HPX_TEST_EQ(counter, el);
+                ++counter;
+            },
+            make_tuple(0, 1),
+            make_tuple(make_tuple(2, 3), make_tuple(4, 5)),
+            make_tuple(make_tuple(make_tuple(6, 7))));
+        HPX_TEST_EQ(counter, 8);
+    }
 
     // The container tuple like type itself is changed
-    {}
+    {
+        tag_shift_mapper mapper;
+        tuple<float, test_tag_2, test_tag_3, test_tag_1> res = map_pack(
+            mapper, make_tuple(1, test_tag_1{}, test_tag_2{}, test_tag_3{}));
+
+        HPX_TEST_EQ(get<0>(res), 0.f);
+    }
 
     // Every element in the tuple like type is remapped
     {
+        tuple<float, float, float> res =
+            map_pack([](int) { return 1.f; }, make_tuple(0, 0, 0));
+
+        auto expected = make_tuple(1.f, 1.f, 1.f);
+
+        static_assert(std::is_same<decltype(res), decltype(expected)>::value,
+            "Type mismatch!");
+        HPX_TEST((res == expected));
     }
 }
 
