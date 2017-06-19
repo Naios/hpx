@@ -432,13 +432,72 @@ static void testStrategicTraverse()
 static void testStrategicContainerTraverse()
 {
     // Every element in the container is visited
-    {}
+    // - Plain container
+    {
+        int counter = 0;
+        counter_mapper mapper(counter);
+        std::vector<int> container;
+        container.resize(100);
+        traverse_pack(mapper, std::move(container));
+        HPX_TEST_EQ(counter, 100);
+    }
+
+    // - Nested container
+    {
+        int counter = 0;
+        counter_mapper mapper(counter);
+        std::vector<std::vector<int>> container;
+        for (unsigned i = 0; i < 10; ++i)
+        {
+            std::vector<int> nested;
+            nested.resize(10);
+            container.push_back(nested);
+        }
+
+        traverse_pack(mapper, std::move(container));
+        HPX_TEST_EQ(counter, 100);
+    }
 
     // The container type itself is changed
-    {}
+    // - Plain container
+    {
+        std::vector<int> container;
+        std::vector<float> res =
+            map_pack([](int) { return 0.f; }, std::move(container));
+    }
+
+    // - Nested container
+    {
+        std::vector<std::vector<int>> container;
+        std::vector<std::vector<float>> res =
+            map_pack([](int) { return 0.f; }, std::move(container));
+    }
 
     // Every element in the container is remapped
+    // - Plain container
     {
+        std::vector<int> container(100, 1);
+        auto res = map_pack([](int i) { return 2; }, std::move(container));
+
+        HPX_TEST((
+            std::all_of(res.begin(), res.end(), [](int i) { return i == 2; })));
+    }
+
+    // - Nested container
+    {
+        std::vector<std::vector<int>> container;
+        for (unsigned i = 0; i < 10; ++i)
+        {
+            std::vector<int> nested(10, 1);
+            container.push_back(nested);
+        }
+
+        auto res = map_pack([](int i) { return 2; }, std::move(container));
+        HPX_TEST((std::all_of(
+            res.begin(), res.end(), [](std::vector<int> const& nested) {
+                return std::all_of(
+                    nested.begin(), nested.end(), [](int i) { return i == 2; });
+            })));
     }
 }
 
