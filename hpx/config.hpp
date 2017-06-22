@@ -22,7 +22,17 @@
 #include <hpx/config/export_definitions.hpp>
 #include <hpx/config/forceinline.hpp>
 #include <hpx/config/manual_profiling.hpp>
+
+// When HPX_CONFIG_NO_INTERNAL_LINK is defined, reduce its exports to make
+// the config usable as a header only file.
+// This can be used in feature test that target header only parts of the
+// HPX framework, so we don't encounter unresolved external symbols when
+// using CMake's try_compile function.
+// We can remove this workaround as soon as CMake 3.6 is the minimal required
+// version. See cmake/HPX_ADDConfigTest.cmake for details.
+#if !defined(HPX_CONFIG_NO_INTERNAL_LINK)
 #include <hpx/config/version.hpp>
+#endif // HPX_CONFIG_NO_INTERNAL_LINK
 
 #include <boost/version.hpp>
 
