@@ -10,7 +10,11 @@
 #include <type_traits>
 #include <utility>
 
+// Don't include the config when we are inside the feature test
+#ifndef HPX_CXX11_SFINAE_EXPRESSION_COMPLETE_FEATURE_TEST
 #include <hpx/config.hpp>
+#endif // HPX_CXX11_SFINAE_EXPRESSION_COMPLETE_FEATURE_TEST
+
 #include <hpx/traits/is_callable.hpp>
 #include <hpx/traits/is_range.hpp>
 #include <hpx/traits/is_tuple_like.hpp>
@@ -19,13 +23,6 @@
 #include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/result_of.hpp>
 #include <hpx/util/tuple.hpp>
-
-/// \cond false
-// TODO Find a better solution for this
-#if !defined(HPX_MSVC)
-#define HPX_HAVE_EXPRESSION_SFINAE
-#endif
-/// \endcond
 
 namespace hpx {
 namespace util {
@@ -236,7 +233,7 @@ namespace util {
             /// to a container of the same type which may contain
             /// different types.
             template <typename T, typename M
-#ifdef HPX_HAVE_EXPRESSION_SFINAE
+#ifdef HPX_HAVE_CXX11_SFINAE_EXPRESSION_COMPLETE
                 ,
                 // Support for skipping completely untouched types
                 typename std::enable_if<
@@ -253,7 +250,7 @@ namespace util {
 
             /// Just call the visitor with the content of the container
             template <typename T, typename M
-#ifdef HPX_HAVE_EXPRESSION_SFINAE
+#ifdef HPX_HAVE_CXX11_SFINAE_EXPRESSION_COMPLETE
                 ,
                 // Support for skipping completely untouched types
                 typename std::enable_if<
@@ -274,7 +271,7 @@ namespace util {
         /// tuple like type to the same type holding different types.
         namespace tuple_like_remapping {
             template <typename Strategy, typename Mapper, typename T
-#ifdef HPX_HAVE_EXPRESSION_SFINAE
+#ifdef HPX_HAVE_CXX11_SFINAE_EXPRESSION_COMPLETE
                 ,
                 typename = void
 #endif
@@ -286,7 +283,7 @@ namespace util {
             template <typename M, template <class...> class Base,
                 typename... OldArgs>
             struct tuple_like_remapper<strategy_remap_tag, M, Base<OldArgs...>
-#ifdef HPX_HAVE_EXPRESSION_SFINAE
+#ifdef HPX_HAVE_CXX11_SFINAE_EXPRESSION_COMPLETE
                 ,
                 // Support for skipping completely untouched types
                 typename std::enable_if<
@@ -308,7 +305,7 @@ namespace util {
                 typename... OldArgs>
             struct tuple_like_remapper<strategy_traverse_tag, M,
                 Base<OldArgs...>
-#ifdef HPX_HAVE_EXPRESSION_SFINAE
+#ifdef HPX_HAVE_CXX11_SFINAE_EXPRESSION_COMPLETE
                 ,
                 // Support for skipping completely untouched types
                 typename std::enable_if<
@@ -333,7 +330,7 @@ namespace util {
             template <typename M, template <class, std::size_t> class Base,
                 typename OldArg, std::size_t Size>
             struct tuple_like_remapper<strategy_remap_tag, M, Base<OldArg, Size>
-#ifdef HPX_HAVE_EXPRESSION_SFINAE
+#ifdef HPX_HAVE_CXX11_SFINAE_EXPRESSION_COMPLETE
                 ,
                 // Support for skipping completely untouched types
                 typename std::enable_if<is_effective_t<M, OldArg>::value>::type
@@ -354,7 +351,7 @@ namespace util {
                 typename OldArg, std::size_t Size>
             struct tuple_like_remapper<strategy_traverse_tag, M,
                 Base<OldArg, Size>
-#ifdef HPX_HAVE_EXPRESSION_SFINAE
+#ifdef HPX_HAVE_CXX11_SFINAE_EXPRESSION_COMPLETE
                 ,
                 // Support for skipping completely untouched types
                 typename std::enable_if<is_effective_t<M, OldArg>::value>::type
@@ -667,8 +664,5 @@ namespace util {
     }    // end namespace detail
 }    // end namespace util
 }    // end namespace hpx
-
-// TODO Fix this (as described above)
-#undef HPX_HAVE_EXPRESSION_SFINAE
 
 #endif    // HPX_UTIL_DETAIL_PACK_TRAVERSAL_IMPL_HPP

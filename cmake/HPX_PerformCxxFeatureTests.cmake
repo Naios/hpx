@@ -27,6 +27,9 @@ macro(hpx_perform_cxx_feature_tests)
   hpx_check_for_cxx11_sfinae_expression(
     DEFINITIONS HPX_HAVE_CXX11_SFINAE_EXPRESSION)
 
+  hpx_check_for_cxx11_sfinae_expression_complete(
+    DEFINITIONS HPX_HAVE_CXX11_SFINAE_EXPRESSION_COMPLETE)
+
   hpx_check_for_cxx11_defaulted_functions(
     REQUIRED "HPX needs support for C++11 defaulted functions")
 
@@ -171,3 +174,9 @@ macro(hpx_perform_cxx_feature_tests)
   endif()
 endmacro()
 
+################################################################################
+# C++ feature tests (late tests which require 3. party libraries)
+################################################################################
+macro(hpx_perform_late_cxx_feature_tests)
+
+endmacro()

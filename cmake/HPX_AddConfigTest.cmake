@@ -62,7 +62,9 @@ macro(add_hpx_config_test variable)
 
     set(CONFIG_TEST_COMPILE_DEFINITIONS ${CONFIG_TEST_COMPILE_DEFINITIONS} ${${variable}_COMPILE_DEFINITIONS})
     set(CONFIG_TEST_LINK_LIBRARIES ${HPX_LIBRARIES} ${${variable}_LIBRARIES})
-
+    message("${variable}")
+    message("${CONFIG_TEST_INCLUDE_DIRS}")
+    message("${${variable}_EXECUTE}")
     if(${variable}_EXECUTE)
       if(NOT CMAKE_CROSSCOMPILING)
         try_run(${variable}_RUN_RESULT ${variable}_COMPILE_RESULT
@@ -96,6 +98,8 @@ macro(add_hpx_config_test variable)
         COPY_FILE ${test_binary})
        hpx_debug("Compile test: ${variable}")
        hpx_debug("Compilation output: ${${variable}_OUTPUT}")
+       message("Compile test: ${variable}")
+       message("Compilation output: ${${variable}_OUTPUT}")
     endif()
 
     set(_run_msg "Success")
@@ -179,6 +183,14 @@ endmacro()
 macro(hpx_check_for_cxx11_sfinae_expression)
   add_hpx_config_test(HPX_WITH_CXX11_SFINAE_EXPRESSION
     SOURCE cmake/tests/cxx11_sfinae_expression.cpp
+    FILE ${ARGN})
+endmacro()
+
+###############################################################################
+macro(hpx_check_for_cxx11_sfinae_expression_complete)
+  add_hpx_config_test(HPX_HAVE_CXX11_SFINAE_EXPRESSION_COMPLETE
+    SOURCE cmake/tests/cxx11_sfinae_expression_complete.cpp
+    # INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}
     FILE ${ARGN})
 endmacro()
 
