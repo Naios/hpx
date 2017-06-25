@@ -96,6 +96,8 @@ macro(add_hpx_config_test variable)
         COPY_FILE ${test_binary})
        hpx_debug("Compile test: ${variable}")
        hpx_debug("Compilation output: ${${variable}_OUTPUT}")
+       message("Compile test: ${variable}")
+       message("Compilation output: ${${variable}_OUTPUT}")
     endif()
 
     set(_run_msg "Success")
