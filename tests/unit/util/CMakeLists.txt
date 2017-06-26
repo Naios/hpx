@@ -14,6 +14,7 @@ set(tests
     parse_slurm_nodelist
     tagged
     tuple
+    unwrapped
    )
 
 if(HPX_WITH_CXX11_STD_INITIALIZER_LIST)
