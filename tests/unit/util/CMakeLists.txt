@@ -14,6 +14,7 @@ set(tests
     parse_slurm_nodelist
     tagged
     tuple
+    unwrap
     unwrapped
    )
 
