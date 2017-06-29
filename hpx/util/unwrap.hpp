@@ -48,7 +48,8 @@ namespace util {
     ///          hpx::util::unwrap_all() that unwraps all future like objects
     ///          recursively which are contained in the arguments.
     ///
-    /// \param   args the arguments that are unwrapped.
+    /// \param   args the arguments that are unwrapped which may contain any
+    ///          arbitrary future or non future type.
     ///
     /// \returns Depending on the count of arguments this function returns
     ///          a hpx::util::tuple containing the unwrapped arguments
