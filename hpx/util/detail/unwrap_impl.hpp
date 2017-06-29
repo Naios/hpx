@@ -10,7 +10,6 @@
 #include <hpx/lcos/future.hpp>
 #include <hpx/traits/future_traits.hpp>
 #include <hpx/traits/is_future.hpp>
-#include <hpx/traits/is_tuple_like.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/pack_traversal.hpp>
@@ -88,7 +87,7 @@ namespace util {
         /// We use a specialized class here because MSVC has issues with
         /// tag dispatching a function because it does semantical checks before
         /// matching the tag, which leads to false errors.
-        template <bool IsTupleLike>
+        template <bool HadMultipleArguments>
         struct invoke_wrapped_impl
         {
             /// Invoke the callable with the tuple argument through invoke_fused
@@ -103,9 +102,11 @@ namespace util {
             }
         };
         template <>
-        struct invoke_wrapped_impl<false /*IsTupleLike*/>
+        struct invoke_wrapped_impl<false /*HadMultipleArguments*/>
         {
-            /// Invoke the callable with the plain argument through invoke
+            /// Invoke the callable with the plain argument through invoke,
+            /// also when the result is a tuple like type, when we received
+            /// a single argument.
             template <typename C, typename T>
             static auto apply(C&& callable, T&& unwrapped) ->
                 typename invoke_result<C, T>::type
@@ -117,13 +118,13 @@ namespace util {
 
         /// map_pack may return a tuple or a plain type, choose the
         /// corresponding invocation function accordingly.
-        template <typename C, typename T>
-        auto invoke_wrapped(C&& callable, T&& unwrapped) -> decltype(
-            invoke_wrapped_impl<traits::is_tuple_like<T>::value>::apply(
+        template <bool HadMultipleArguments, typename C, typename T>
+        auto invoke_wrapped(C&& callable, T&& unwrapped)
+            -> decltype(invoke_wrapped_impl<HadMultipleArguments>::apply(
                 std::forward<C>(callable),
                 std::forward<T>(unwrapped)))
         {
-            return invoke_wrapped_impl<traits::is_tuple_like<T>::value>::apply(
+            return invoke_wrapped_impl<HadMultipleArguments>::apply(
                 std::forward<C>(callable), std::forward<T>(unwrapped));
         }
 
@@ -142,11 +143,11 @@ namespace util {
             }
 
             template <typename... Args>
-            auto operator()(Args&&... args)
-                -> decltype(invoke_wrapped(std::declval<T&>(),
+            auto operator()(Args&&... args) -> decltype(
+                invoke_wrapped<(sizeof...(args) > 1)>(std::declval<T&>(),
                     unwrap_depth_impl<Depth>(std::forward<Args>(args)...)))
             {
-                return invoke_wrapped(wrapped_,
+                return invoke_wrapped<(sizeof...(args) > 1)>(wrapped_,
                     unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
             }
 
