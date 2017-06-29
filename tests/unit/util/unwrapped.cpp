@@ -6,6 +6,10 @@
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 ////////////////////////////////////////////////////////////////////////////////
 
+// EVIL
+#define HPX_NO_DEPRECATE_UNWRAPPED
+#define HPX_UNWRAPPED_NEW_IMPL
+
 #include <hpx/hpx_init.hpp>
 #include <hpx/include/threads.hpp>
 #include <hpx/include/actions.hpp>
