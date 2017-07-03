@@ -471,6 +471,19 @@ static void testStrategicTraverse()
         HPX_TEST_EQ((*get<2>(res)), 4U);
     }
 
+    // Move only types contained in a pack which was passed as l-value
+    // reference is forwarded to the mapper as reference too.
+    {
+        std::vector<std::unique_ptr<int>> container;
+        container.push_back(std::unique_ptr<int>(new int(3)));
+
+        std::vector<int> res =
+            map_pack([](std::unique_ptr<int>& p) { return *p; }, container);
+
+        HPX_TEST_EQ(res.size(), 1U);
+        HPX_TEST_EQ(res[0], 3);
+    }
+
     // Single object remapping returns the value itself without any boxing
     {
         int res = map_pack([](int i) { return i; }, 1);
