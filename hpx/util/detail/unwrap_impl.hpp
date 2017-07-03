@@ -10,6 +10,7 @@
 #include <hpx/lcos/future.hpp>
 #include <hpx/traits/future_traits.hpp>
 #include <hpx/traits/is_future.hpp>
+#include <hpx/traits/is_tuple_like.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/pack_traversal.hpp>
@@ -107,7 +108,7 @@ namespace util {
         /// We use a specialized class here because MSVC has issues with
         /// tag dispatching a function because it does semantical checks before
         /// matching the tag, which leads to false errors.
-        template <bool HadMultipleArguments>
+        template <bool IsFusedInvoke>
         struct invoke_wrapped_impl
         {
             /// Invoke the callable with the tuple argument through invoke_fused
@@ -122,7 +123,7 @@ namespace util {
             }
         };
         template <>
-        struct invoke_wrapped_impl<false /*HadMultipleArguments*/>
+        struct invoke_wrapped_impl<false /*IsFusedInvoke*/>
         {
             /// Invoke the callable with the plain argument through invoke,
             /// also when the result is a tuple like type, when we received
@@ -136,17 +137,33 @@ namespace util {
             }
         };
 
+        /// Indicates whether we should invoke the result through invoke_fused:
+        /// - We called the function with multiple arguments.
+        /// - The result is a tuple like type and UnwrapTopLevelTuples is set.
+        template <bool HadMultipleArguments, bool UnwrapTopLevelTuples,
+            typename Result>
+        using should_fuse_invoke = std::integral_constant<bool,
+            HadMultipleArguments ||
+                (UnwrapTopLevelTuples &&
+                    traits::is_tuple_like<
+                        typename std::decay<Result>::type>::value)>;
+
         /// map_pack may return a tuple or a plain type, choose the
         /// corresponding invocation function accordingly.
-        template <bool HadMultipleArguments, typename Config, typename C,
-            typename T>
-        auto invoke_wrapped(Config, C&& callable, T&& unwrapped)
-            -> decltype(invoke_wrapped_impl<HadMultipleArguments>::apply(
-                std::forward<C>(callable),
+        template <bool HadMultipleArguments, bool AllowVoidFutures,
+            bool UnwrapTopLevelTuples, typename C, typename T>
+        auto invoke_wrapped(
+            unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>, C&& callable,
+            T&& unwrapped)
+            -> decltype(invoke_wrapped_impl<
+                should_fuse_invoke<HadMultipleArguments, UnwrapTopLevelTuples,
+                    T>::value>::apply(std::forward<C>(callable),
                 std::forward<T>(unwrapped)))
         {
-            return invoke_wrapped_impl<HadMultipleArguments>::apply(
-                std::forward<C>(callable), std::forward<T>(unwrapped));
+            return invoke_wrapped_impl<
+                should_fuse_invoke<HadMultipleArguments, UnwrapTopLevelTuples,
+                    T>::value>::apply(std::forward<C>(callable),
+                std::forward<T>(unwrapped));
         }
 
         /// Implements the callable object which is returned by n invocation
