@@ -99,13 +99,11 @@ int hpx_main(
         ///////////////////////////////////////////////////////////////////////
         // Sync wait, single future, void return.
         {
-#if defined(HPX_UNWRAPPED_VOID_TESTS)
             unwrapped(async<null_action>(here_));
 
             HPX_TEST_EQ(1U, void_counter.load());
 
             void_counter.store(0);
-#endif // HPX_UNWRAPPED_VOID_TESTS
         }
 
         ///////////////////////////////////////////////////////////////////////
@@ -120,7 +118,6 @@ int hpx_main(
         ///////////////////////////////////////////////////////////////////////
         // Sync wait, multiple futures, void return.
         {
-#if defined(HPX_UNWRAPPED_VOID_TESTS)
             unwrapped(async<null_action>(here_)
                , async<null_action>(here_)
                , async<null_action>(here_));
@@ -128,7 +125,6 @@ int hpx_main(
             HPX_TEST_EQ(3U, void_counter.load());
 
             void_counter.store(0);
-#endif // HPX_UNWRAPPED_VOID_TESTS
         }
 
         ///////////////////////////////////////////////////////////////////////
@@ -150,7 +146,6 @@ int hpx_main(
         ///////////////////////////////////////////////////////////////////////
         // Sync wait, vector of futures, void return.
         {
-#if defined(HPX_UNWRAPPED_VOID_TESTS)
             std::vector<future<void> > futures;
             futures.reserve(64);
 
@@ -162,13 +157,11 @@ int hpx_main(
             HPX_TEST_EQ(64U, void_counter.load());
 
             void_counter.store(0);
-#endif // HPX_UNWRAPPED_VOID_TESTS
         }
 
 #if defined(HPX_HAVE_CXX11_STD_ARRAY)
         // Sync wait, array of futures, void return.
         {
-#if defined(HPX_UNWRAPPED_VOID_TESTS)
             std::array<future<void>, 64> futures;
 
             for (std::size_t i = 0; i < 64; ++i)
@@ -179,7 +172,6 @@ int hpx_main(
             HPX_TEST_EQ(64U, void_counter.load());
 
             void_counter.store(0);
-#endif // HPX_UNWRAPPED_VOID_TESTS
         }
 #endif
 
