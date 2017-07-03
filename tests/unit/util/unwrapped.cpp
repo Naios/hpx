@@ -197,7 +197,6 @@ int hpx_main(
                 futures.push_back(std::move(im));
             }
 
-            /*
             values = unwrapped(futures);
 
             HPX_TEST_EQ(64U, result_counter.load());
@@ -206,7 +205,6 @@ int hpx_main(
                 HPX_TEST_EQ(true, values[i]);
 
             result_counter.store(0);
-            */
         }
 
 #if defined(HPX_HAVE_CXX11_STD_ARRAY)
