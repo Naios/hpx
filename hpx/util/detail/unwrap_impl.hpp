@@ -22,6 +22,26 @@
 namespace hpx {
 namespace util {
     namespace detail {
+        /// This struct defines a configurateable environment in order
+        /// to adapt the unwrapping behaviour.
+        ///
+        /// The old unwrap (unwrapped) allowed futures to be instanted
+        /// with void whereas the new one doesn't.
+        ///
+        /// The old unwrap (unwrapped) also unwraps the first occuring future
+        /// independently a single value or multiple ones were passed to it.
+        /// This behaviour is inconsistent and was removed in the
+        /// new implementation.
+        template <bool AllowVoidFutures, bool UnwrapTopLevelTuples>
+        struct unwrap_config
+        {
+        };
+
+        /// The old unwrapped implementation
+        using old_unwrap_config = unwrap_config<true, true>;
+        /// The new unwrap implementation
+        using new_unwrap_config = unwrap_config<false, false>;
+
         /// A mapper that maps futures to its representing type
         ///
         /// The mapper does unwrap futures nested inside futures until
@@ -75,8 +95,8 @@ namespace util {
 
         /// Unwraps the futures contained in the given pack args
         /// until the depth Depth.
-        template <std::size_t Depth, typename... Args>
-        auto unwrap_depth_impl(Args&&... args)
+        template <std::size_t Depth, typename Config, typename... Args>
+        auto unwrap_depth_impl(Config, Args&&... args)
             -> decltype(map_pack(future_unwrap_until_depth<Depth>{},
                 std::forward<Args>(args)...))
         {
@@ -118,8 +138,9 @@ namespace util {
 
         /// map_pack may return a tuple or a plain type, choose the
         /// corresponding invocation function accordingly.
-        template <bool HadMultipleArguments, typename C, typename T>
-        auto invoke_wrapped(C&& callable, T&& unwrapped)
+        template <bool HadMultipleArguments, typename Config, typename C,
+            typename T>
+        auto invoke_wrapped(Config, C&& callable, T&& unwrapped)
             -> decltype(invoke_wrapped_impl<HadMultipleArguments>::apply(
                 std::forward<C>(callable),
                 std::forward<T>(unwrapped)))
@@ -130,7 +151,7 @@ namespace util {
 
         /// Implements the callable object which is returned by n invocation
         /// to hpx::util::unwrap and similar functions.
-        template <typename T, std::size_t Depth>
+        template <typename Config, typename T, std::size_t Depth>
         class functional_unwrap_impl
         {
             /// The wrapped callable object
@@ -143,32 +164,38 @@ namespace util {
             }
 
             template <typename... Args>
-            auto operator()(Args&&... args) -> decltype(
-                invoke_wrapped<(sizeof...(args) > 1)>(std::declval<T&>(),
-                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...)))
+            auto operator()(Args&&... args)
+                -> decltype(invoke_wrapped<(sizeof...(args) > 1)>(Config{},
+                    std::declval<T&>(),
+                    unwrap_depth_impl<Depth>(Config{},
+                        std::forward<Args>(args)...)))
             {
-                return invoke_wrapped<(sizeof...(args) > 1)>(wrapped_,
-                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
+                return invoke_wrapped<(sizeof...(args) > 1)>(Config{}, wrapped_,
+                    unwrap_depth_impl<Depth>(
+                        Config{}, std::forward<Args>(args)...));
             }
 
             template <typename... Args>
             auto operator()(Args&&... args) const
-                -> decltype(invoke_wrapped(std::declval<T const&>(),
-                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...)))
+                -> decltype(invoke_wrapped(Config{}, std::declval<T const&>(),
+                    unwrap_depth_impl<Depth>(Config{},
+                        std::forward<Args>(args)...)))
             {
-                return invoke_wrapped(wrapped_,
-                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
+                return invoke_wrapped(Config{}, wrapped_,
+                    unwrap_depth_impl<Depth>(
+                        Config{}, std::forward<Args>(args)...));
             }
         };
 
         /// Returns a callable object which unwraps the futures
         /// contained in the given pack args until the depth Depth.
-        template <std::size_t Depth, typename T>
-        auto functional_unwrap_depth_impl(T&& callable)
-            -> functional_unwrap_impl<typename std::decay<T>::type, Depth>
+        template <std::size_t Depth, typename Config, typename T>
+        auto functional_unwrap_depth_impl(Config, T&& callable)
+            -> functional_unwrap_impl<Config, typename std::decay<T>::type,
+                Depth>
         {
-            return functional_unwrap_impl<typename std::decay<T>::type, Depth>(
-                std::forward<T>(callable));
+            return functional_unwrap_impl<Config, typename std::decay<T>::type,
+                Depth>(std::forward<T>(callable));
         }
     }
 }    // end namespace util
