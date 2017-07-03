@@ -132,7 +132,7 @@ namespace util {
             static auto apply(C&& callable, T&& unwrapped) ->
                 typename invoke_result<C, T>::type
             {
-                return invoke(
+                return util::invoke(
                     std::forward<C>(callable), std::forward<T>(unwrapped));
             }
         };
