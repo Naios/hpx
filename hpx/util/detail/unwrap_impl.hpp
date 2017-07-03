@@ -34,8 +34,8 @@ namespace util {
         struct future_unwrap_until_depth
         {
             template <typename T,
-                typename std::enable_if<traits::is_future<T>::value>::type* =
-                    nullptr>
+                typename std::enable_if<traits::is_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
             auto operator()(T&& future) const
                 -> decltype(map_pack(future_unwrap_until_depth<Depth - 1>{},
                     std::forward<T>(future).get()))
@@ -48,8 +48,8 @@ namespace util {
         struct future_unwrap_until_depth<1U>
         {
             template <typename T,
-                typename std::enable_if<traits::is_future<T>::value>::type* =
-                    nullptr>
+                typename std::enable_if<traits::is_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
             auto operator()(T&& future) const ->
                 typename traits::future_traits<T>::result_type
             {
@@ -63,8 +63,8 @@ namespace util {
             /// until an arbitrary depth.
             /// Thus the return value will contain no future.
             template <typename T,
-                typename std::enable_if<traits::is_future<T>::value>::type* =
-                    nullptr>
+                typename std::enable_if<traits::is_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
             auto operator()(T&& future) const -> decltype(
                 map_pack(std::declval<future_unwrap_until_depth const&>(),
                     std::forward<T>(future).get()))
