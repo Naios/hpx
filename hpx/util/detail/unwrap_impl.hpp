@@ -57,11 +57,12 @@ namespace util {
             unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>
         {
             template <typename T>
-            unwrapped_void_tag evaluate(util::identity<void>, T&&) const
+            unwrapped_void_tag evaluate(util::identity<void>, T&& future) const
             {
                 static_assert(AllowVoidFutures && std::is_same<T, T>::value,
                     "Unwrapping future<void> or shared_future<void> is "
                     "forbidden! Use hpx::lcos::wait_all instead!");
+                std::forward<T>(future).get();
                 return {};
             }
 
