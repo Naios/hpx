@@ -728,6 +728,18 @@ namespace util {
     ///         resolved through an exception.
     ///         See hpx::lcos::future::get() for details.
     ///
+    /// \deprecated hpx::util::unwrapped was replaced by hpx::util::unwrap
+    ///             and hpx::util::unwrapping and might be removed in a
+    ///             later version of HPX!
+    ///             The main reason for deprecation was that the automatic
+    ///             callable type detection doesn't anymore correctly,
+    ///             as soon as we allowed to route non future types through.
+    ///             In addition the capability to wait for futures which
+    ///             were instantiated with void was removed,
+    ///             use hpx::lcos::wait_all instead.
+    ///             Also top level tuple like types aren't unwrapped anymore
+    ///             when those are passed as a single argument for consistency.
+    ///
     template <typename... Args>
 #if !defined(HPX_NO_DEPRECATE_UNWRAPPED)
     HPX_DEPRECATED("hpx::util::unwrapped was replaced by "
@@ -746,7 +758,12 @@ namespace util {
     /// Provides an additional implementation of unwrapped which
     /// unwraps nested hpx::futures within a two-level depth.
     ///
+    /// \deprecated hpx::util::unwrapped2 was replaced by hpx::util::unwrap_n<2>
+    ///             and hpx::util::unwrapping_n<2> and might be removed in a
+    ///             later version of HPX!
+    ///
     /// See hpx::util::unwrapped() for details.
+    ///
     template <typename... Args>
 #if !defined(HPX_NO_DEPRECATE_UNWRAPPED)
     HPX_DEPRECATED("hpx::util::unwrapped2 was replaced by "
