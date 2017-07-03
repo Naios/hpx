@@ -17,6 +17,10 @@
 #include <utility>
 #include <vector>
 
+#if defined(HPX_HAVE_CXX11_STD_ARRAY)
+#include <array>
+#endif
+
 using namespace hpx;
 using namespace hpx::util;
 using namespace hpx::util::detail;
@@ -617,6 +621,16 @@ static void testStrategicTupleLikeTraverse()
             "Type mismatch!");
         HPX_TEST((res == expected));
     }
+
+#if defined(HPX_HAVE_CXX11_STD_ARRAY)
+    // Fixed size homogeneous container
+    {
+        std::array<int, 3> values{{1, 2, 3}};
+        std::array<float, 3> res = map_pack([](int) { return 1.f; }, values);
+
+        HPX_TEST((res == std::array<float, 3>{{1.f, 1.f, 1.f}}));
+    }
+#endif
 }
 
 int main(int, char**)
