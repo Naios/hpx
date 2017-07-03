@@ -65,15 +65,10 @@ static void testFunctionalFutureUnwrap()
         HPX_TEST_EQ((res), (3));
     }
 
-    // Regression
+    // Regression: (originally taken from the unwrapped tests)
     {
-        /*future<int> future = hpx::make_ready_future(42);
-
-        auto unwrapper = unwrapping(&increment);
-
-        int i = unwrapper(future);
-        // HPX_TEST_EQ(i, 42 + 1);
-        int ii = 0;*/
+        future<int> future = hpx::make_ready_future(42);
+        HPX_TEST_EQ(unwrapping(&increment)(future), 42 + 1);
     }
 }
 
