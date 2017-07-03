@@ -8,6 +8,7 @@
 
 // EVIL
 #define HPX_NO_DEPRECATE_UNWRAPPED
+#define HPX_UNWRAPPED_NEW_IMPL
 
 #include <hpx/hpx_init.hpp>
 #include <hpx/include/threads.hpp>
@@ -208,7 +209,6 @@ int hpx_main(
             */
         }
 
-#if false
 #if defined(HPX_HAVE_CXX11_STD_ARRAY)
         // Sync wait, array of futures, non-void return.
         {
@@ -302,7 +302,6 @@ int hpx_main(
             HPX_TEST_EQ(unwrapped2(&add)(tuple_future), 42 + 42);
         }
     }
-#endif
 
     finalize();
 
