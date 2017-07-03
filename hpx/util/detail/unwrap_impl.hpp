@@ -11,6 +11,7 @@
 #include <hpx/traits/future_traits.hpp>
 #include <hpx/traits/is_future.hpp>
 #include <hpx/traits/is_tuple_like.hpp>
+#include <hpx/util/identity.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/pack_traversal.hpp>
@@ -43,6 +44,52 @@ namespace util {
         /// The new unwrap implementation
         using new_unwrap_config = unwrap_config<false, false>;
 
+        /// A tag which may replace void results when unwrapping
+        struct unwrapped_void_tag
+        {
+        };
+
+        template <typename Child, typename Config>
+        struct unwrap_base;
+        template <typename Child, bool AllowVoidFutures,
+            bool UnwrapTopLevelTuples>
+        struct unwrap_base<Child,
+            unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>
+        {
+            template <typename T>
+            unwrapped_void_tag evaluate(util::identity<void>, T&&) const
+            {
+                static_assert(AllowVoidFutures && std::is_same<T, T>::value,
+                    "Unwrapping future<void> or shared_future<void> is "
+                    "forbidden! Use hpx::lcos::wait_all instead!");
+                return {};
+            }
+
+            template <typename R, typename T>
+            auto evaluate(util::identity<R>, T&& future) const
+                -> decltype(std::declval<Child const*>()->transform(
+                    std::forward<T>(future)))
+            {
+                return static_cast<Child const*>(this)->transform(
+                    std::forward<T>(future));
+            }
+
+            template <typename T,
+                typename std::enable_if<traits::is_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
+            auto operator()(T&& future) const
+                -> decltype(std::declval<unwrap_base>().evaluate(
+                    util::identity<typename traits::future_traits<
+                        typename std::decay<T>::type>::result_type>{},
+                    std::forward<T>(future)))
+            {
+                return evaluate(
+                    util::identity<typename traits::future_traits<
+                        typename std::decay<T>::type>::result_type>{},
+                    std::forward<T>(future));
+            }
+        };
+
         /// A mapper that maps futures to its representing type
         ///
         /// The mapper does unwrap futures nested inside futures until
@@ -51,42 +98,48 @@ namespace util {
         /// - Depth >  1 -> Depth remaining
         /// - Depth == 1 -> One depth remaining
         /// - Depth == 0 -> Unlimited depths
-        template <std::size_t Depth>
+        template <std::size_t Depth, typename Config>
         struct future_unwrap_until_depth
+          : unwrap_base<future_unwrap_until_depth<Depth, Config>, Config>
         {
-            template <typename T,
-                typename std::enable_if<traits::is_future<
-                    typename std::decay<T>::type>::value>::type* = nullptr>
-            auto operator()(T&& future) const
-                -> decltype(map_pack(future_unwrap_until_depth<Depth - 1>{},
+            using unwrap_base<future_unwrap_until_depth<Depth, Config>,
+                Config>::operator();
+
+            template <typename T>
+            auto transform(T&& future) const -> decltype(
+                map_pack(future_unwrap_until_depth<Depth - 1, Config>{},
                     std::forward<T>(future).get()))
             {
-                return map_pack(future_unwrap_until_depth<Depth - 1>{},
+                return map_pack(future_unwrap_until_depth<Depth - 1, Config>{},
                     std::forward<T>(future).get());
             }
         };
-        template <>
-        struct future_unwrap_until_depth<1U>
+        template <typename Config>
+        struct future_unwrap_until_depth<1U, Config>
+          : unwrap_base<future_unwrap_until_depth<1U, Config>, Config>
         {
-            template <typename T,
-                typename std::enable_if<traits::is_future<
-                    typename std::decay<T>::type>::value>::type* = nullptr>
-            auto operator()(T&& future) const ->
-                typename traits::future_traits<T>::result_type
+            using unwrap_base<future_unwrap_until_depth<1U, Config>, Config>::
+            operator();
+
+            template <typename T>
+            auto transform(T&& future) const -> typename traits::future_traits<
+                typename std::decay<T>::type>::result_type
             {
                 return std::forward<T>(future).get();
             }
         };
-        template <>
-        struct future_unwrap_until_depth<0U>
+        template <typename Config>
+        struct future_unwrap_until_depth<0U, Config>
+          : unwrap_base<future_unwrap_until_depth<0U, Config>, Config>
         {
+            using unwrap_base<future_unwrap_until_depth<0U, Config>, Config>::
+            operator();
+
             /// The mapper unwraps futures that are nested inside other futures
             /// until an arbitrary depth.
             /// Thus the return value will contain no future.
-            template <typename T,
-                typename std::enable_if<traits::is_future<
-                    typename std::decay<T>::type>::value>::type* = nullptr>
-            auto operator()(T&& future) const -> decltype(
+            template <typename T>
+            auto transform(T&& future) const -> decltype(
                 map_pack(std::declval<future_unwrap_until_depth const&>(),
                     std::forward<T>(future).get()))
             {
@@ -98,10 +151,10 @@ namespace util {
         /// until the depth Depth.
         template <std::size_t Depth, typename Config, typename... Args>
         auto unwrap_depth_impl(Config, Args&&... args)
-            -> decltype(map_pack(future_unwrap_until_depth<Depth>{},
+            -> decltype(map_pack(future_unwrap_until_depth<Depth, Config>{},
                 std::forward<Args>(args)...))
         {
-            return map_pack(future_unwrap_until_depth<Depth>{},
+            return map_pack(future_unwrap_until_depth<Depth, Config>{},
                 std::forward<Args>(args)...);
         }
 
