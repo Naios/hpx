@@ -265,7 +265,8 @@ int hpx_main(
         {
             future<int> future = hpx::make_ready_future(42);
 
-            HPX_TEST_EQ(unwrapped(&increment)(future), 42 + 1);
+            int i = unwrapped(&increment)(future);
+            HPX_TEST_EQ(i, 42 + 1);
         }
 
         ///////////////////////////////////////////////////////////////////////

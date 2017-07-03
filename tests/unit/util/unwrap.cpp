@@ -8,9 +8,6 @@
 #include <hpx/util/tuple.hpp>
 #include <hpx/util/unwrap.hpp>
 
-#define HPX_NO_DEPRECATE_UNWRAPPED
-#include <hpx/util/unwrapped.hpp>
-
 using namespace hpx::util;
 using namespace hpx::lcos;
 
@@ -31,6 +28,11 @@ static void testFutureUnwrap()
             unwrap(make_ready_future(0xDD), make_ready_future(0xDF));
         HPX_TEST((res == make_tuple(0xDD, 0xDF)));
     }
+}
+
+int increment(int c)
+{
+    return c + 1;
 }
 
 static void testFunctionalFutureUnwrap()
@@ -62,12 +64,26 @@ static void testFunctionalFutureUnwrap()
 
         HPX_TEST_EQ((res), (3));
     }
+
+    // Regression
+    {
+        /*future<int> future = hpx::make_ready_future(42);
+
+        auto unwrapper = unwrapping(&increment);
+
+        int i = unwrapper(future);
+        // HPX_TEST_EQ(i, 42 + 1);
+        int ii = 0;*/
+    }
 }
 
 static void testLegacyUnwrap()
 {
-    std::vector<future<int>> f;
-    std::vector<int> res = unwrap(f);
+    // Regression
+    {
+        std::vector<future<int>> f;
+        std::vector<int> res = unwrap(f);
+    }
 }
 
 int main(int, char**)
