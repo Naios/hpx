@@ -51,45 +51,6 @@ namespace util {
 
         template <typename Child, typename Config>
         struct unwrap_base;
-        template <typename Child, bool AllowVoidFutures,
-            bool UnwrapTopLevelTuples>
-        struct unwrap_base<Child,
-            unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>
-        {
-            template <typename T>
-            unwrapped_void_tag evaluate(util::identity<void>, T&& future) const
-            {
-                static_assert(AllowVoidFutures && std::is_same<T, T>::value,
-                    "Unwrapping future<void> or shared_future<void> is "
-                    "forbidden! Use hpx::lcos::wait_all instead!");
-                std::forward<T>(future).get();
-                return {};
-            }
-
-            template <typename R, typename T>
-            auto evaluate(util::identity<R>, T&& future) const
-                -> decltype(std::declval<Child const*>()->transform(
-                    std::forward<T>(future)))
-            {
-                return static_cast<Child const*>(this)->transform(
-                    std::forward<T>(future));
-            }
-
-            template <typename T,
-                typename std::enable_if<traits::is_future<
-                    typename std::decay<T>::type>::value>::type* = nullptr>
-            auto operator()(T&& future) const
-                -> decltype(std::declval<unwrap_base>().evaluate(
-                    util::identity<typename traits::future_traits<
-                        typename std::decay<T>::type>::result_type>{},
-                    std::forward<T>(future)))
-            {
-                return evaluate(
-                    util::identity<typename traits::future_traits<
-                        typename std::decay<T>::type>::result_type>{},
-                    std::forward<T>(future));
-            }
-        };
 
         /// A mapper that maps futures to its representing type
         ///
@@ -145,6 +106,46 @@ namespace util {
                     std::forward<T>(future).get()))
             {
                 return map_pack(*this, std::forward<T>(future).get());
+            }
+        };
+
+        template <typename Child, bool AllowVoidFutures,
+            bool UnwrapTopLevelTuples>
+        struct unwrap_base<Child,
+            unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>
+        {
+            template <typename T>
+            unwrapped_void_tag evaluate(util::identity<void>, T&& future) const
+            {
+                static_assert(AllowVoidFutures && std::is_same<T, T>::value,
+                    "Unwrapping future<void> or shared_future<void> is "
+                    "forbidden! Use hpx::lcos::wait_all instead!");
+                std::forward<T>(future).get();
+                return {};
+            }
+
+            template <typename R, typename T>
+            auto evaluate(util::identity<R>, T&& future) const
+                -> decltype(std::declval<Child const*>()->transform(
+                    std::forward<T>(future)))
+            {
+                return static_cast<Child const*>(this)->transform(
+                    std::forward<T>(future));
+            }
+
+            template <typename T,
+                typename std::enable_if<traits::is_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
+            auto operator()(T&& future) const
+                -> decltype(std::declval<unwrap_base>().evaluate(
+                    util::identity<typename traits::future_traits<
+                        typename std::decay<T>::type>::result_type>{},
+                    std::forward<T>(future)))
+            {
+                return evaluate(
+                    util::identity<typename traits::future_traits<
+                        typename std::decay<T>::type>::result_type>{},
+                    std::forward<T>(future));
             }
         };
 
