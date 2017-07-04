@@ -49,8 +49,28 @@ namespace util {
         {
         };
 
-        template <typename Child, typename Config>
+        template <typename Config>
         struct unwrap_base;
+
+        template <bool AllowVoidFutures, bool UnwrapTopLevelTuples>
+        struct unwrap_base<
+            unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>
+        {
+            template <typename T,
+                typename std::enable_if<
+                    traits::is_future<typename std::decay<T>::type>::value &&
+                    std::is_void<typename traits::future_traits<
+                        typename std::decay<T>::type>::result_type>::value>::
+                    type* = nullptr>
+            unwrapped_void_tag operator()(T&& future) const
+            {
+                static_assert(AllowVoidFutures && std::is_same<T, T>::value,
+                    "Unwrapping future<void> or shared_future<void> is "
+                    "forbidden! Use hpx::lcos::wait_all instead!");
+                std::forward<T>(future).get();
+                return {};
+            }
+        };
 
         /// A mapper that maps futures to its representing type
         ///
@@ -61,14 +81,17 @@ namespace util {
         /// - Depth == 1 -> One depth remaining
         /// - Depth == 0 -> Unlimited depths
         template <std::size_t Depth, typename Config>
-        struct future_unwrap_until_depth
-          : unwrap_base<future_unwrap_until_depth<Depth, Config>, Config>
+        struct future_unwrap_until_depth : unwrap_base<Config>
         {
-            using unwrap_base<future_unwrap_until_depth<Depth, Config>,
-                Config>::operator();
+            using unwrap_base<Config>::operator();
 
-            template <typename T>
-            auto transform(T&& future) const -> decltype(
+            template <typename T,
+                typename std::enable_if<
+                    traits::is_future<typename std::decay<T>::type>::value &&
+                    !std::is_void<typename traits::future_traits<
+                        typename std::decay<T>::type>::result_type>::value>::
+                    type* = nullptr>
+            auto operator()(T&& future) const -> decltype(
                 map_pack(future_unwrap_until_depth<Depth - 1, Config>{},
                     std::forward<T>(future).get()))
             {
@@ -77,75 +100,38 @@ namespace util {
             }
         };
         template <typename Config>
-        struct future_unwrap_until_depth<1U, Config>
-          : unwrap_base<future_unwrap_until_depth<1U, Config>, Config>
+        struct future_unwrap_until_depth<1U, Config> : unwrap_base<Config>
         {
-            using unwrap_base<future_unwrap_until_depth<1U, Config>, Config>::
-            operator();
+            using unwrap_base<Config>::operator();
 
-            template <typename T>
-            auto transform(T&& future) const -> typename traits::future_traits<
+            template <typename T,
+                typename std::enable_if<
+                    traits::is_future<typename std::decay<T>::type>::value &&
+                    !std::is_void<typename traits::future_traits<
+                        typename std::decay<T>::type>::result_type>::value>::
+                    type* = nullptr>
+            auto operator()(T&& future) const -> typename traits::future_traits<
                 typename std::decay<T>::type>::result_type
             {
                 return std::forward<T>(future).get();
             }
         };
         template <typename Config>
-        struct future_unwrap_until_depth<0U, Config>
-          : unwrap_base<future_unwrap_until_depth<0U, Config>, Config>
+        struct future_unwrap_until_depth<0U, Config> : unwrap_base<Config>
         {
-            using unwrap_base<future_unwrap_until_depth<0U, Config>, Config>::
-            operator();
+            using unwrap_base<Config>::operator();
 
-            /// The mapper unwraps futures that are nested inside other futures
-            /// until an arbitrary depth.
-            /// Thus the return value will contain no future.
-            template <typename T>
-            auto transform(T&& future) const -> decltype(
+            template <typename T,
+                typename std::enable_if<
+                    traits::is_future<typename std::decay<T>::type>::value &&
+                    !std::is_void<typename traits::future_traits<
+                        typename std::decay<T>::type>::result_type>::value>::
+                    type* = nullptr>
+            auto operator()(T&& future) const -> decltype(
                 map_pack(std::declval<future_unwrap_until_depth const&>(),
                     std::forward<T>(future).get()))
             {
                 return map_pack(*this, std::forward<T>(future).get());
-            }
-        };
-
-        template <typename Child, bool AllowVoidFutures,
-            bool UnwrapTopLevelTuples>
-        struct unwrap_base<Child,
-            unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>
-        {
-            template <typename T>
-            unwrapped_void_tag evaluate(util::identity<void>, T&& future) const
-            {
-                static_assert(AllowVoidFutures && std::is_same<T, T>::value,
-                    "Unwrapping future<void> or shared_future<void> is "
-                    "forbidden! Use hpx::lcos::wait_all instead!");
-                std::forward<T>(future).get();
-                return {};
-            }
-
-            template <typename R, typename T>
-            auto evaluate(util::identity<R>, T&& future) const
-                -> decltype(std::declval<Child const*>()->transform(
-                    std::forward<T>(future)))
-            {
-                return static_cast<Child const*>(this)->transform(
-                    std::forward<T>(future));
-            }
-
-            template <typename T,
-                typename std::enable_if<traits::is_future<
-                    typename std::decay<T>::type>::value>::type* = nullptr>
-            auto operator()(T&& future) const
-                -> decltype(std::declval<unwrap_base>().evaluate(
-                    util::identity<typename traits::future_traits<
-                        typename std::decay<T>::type>::result_type>{},
-                    std::forward<T>(future)))
-            {
-                return evaluate(
-                    util::identity<typename traits::future_traits<
-                        typename std::decay<T>::type>::result_type>{},
-                    std::forward<T>(future));
             }
         };
 
