@@ -81,8 +81,8 @@ int hpx_main(variables_map & vm)
 
         for (int i = 0; i < t; ++i)
         {
-            shared_future<double> interest = dataflow(unwrapped(calc), principal, rate);
-            principal = dataflow(unwrapped(add), principal, interest);
+            shared_future<double> interest = dataflow(unwrap(calc), principal, rate);
+            principal = dataflow(unwrapping(add), principal, interest);
         }
 
         // wait for the dataflow execution graph to be finished calculating our

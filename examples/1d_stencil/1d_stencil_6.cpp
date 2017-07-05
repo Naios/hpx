@@ -279,7 +279,7 @@ struct stepper
 
         return dataflow(
             hpx::launch::async,
-            unwrapped(
+            unwrapping(
                 [left, middle, right](partition_data const& l, partition_data const& m,
                     partition_data const& r)
                 {

@@ -282,7 +282,7 @@ double timestep_size(std::uint64_t timestep)
   double dt_cfl = 1000.0;
 
    wait_each(
-      hpx::util::unwrapped([&](cell const& this_cell)
+      hpx::util::unwrapping([&](cell const& this_cell)
       {
       // look at all of the cells at a timestep, then pick the smallest
       // dt_cfl = cfl_factor*dx/(soundspeed+absolute_velocity)
@@ -305,7 +305,7 @@ double timestep_size(std::uint64_t timestep)
 
   // wait for an array of futures
   /*wait_each(grid.time_array,
-    hpx::util::unwrapped([&](cell const& this_cell)
+    hpx::util::unwrapping([&](cell const& this_cell)
     {
       // look at all of the cells at a timestep, then pick the smallest
       // dt_cfl = cfl_factor*dx/(soundspeed+absolute_velocity)

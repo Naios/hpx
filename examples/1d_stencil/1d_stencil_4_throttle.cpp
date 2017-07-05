@@ -221,7 +221,7 @@ struct stepper
             }
         );
 
-        auto Op = unwrapped(&stepper::heat_part);
+        auto Op = unwrapping(&stepper::heat_part);
 
         // Actual time step loop
         for (std::size_t t = 0; t != nt; ++t)

@@ -77,7 +77,7 @@ struct stepper
         for (std::size_t i = 0; i != nx; ++i)
             U[0][i] = hpx::make_ready_future(double(i));
 
-        auto Op = unwrapped(&stepper::heat);
+        auto Op = unwrapping(&stepper::heat);
 
         // Actual time step loop
         for (std::size_t t = 0; t != nt; ++t)
