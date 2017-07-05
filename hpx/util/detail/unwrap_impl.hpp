@@ -7,11 +7,9 @@
 #define HPX_UTIL_DETAIL_UNWRAP_IMPL_HPP
 
 #include <hpx/config.hpp>
-#include <hpx/lcos/future.hpp>
 #include <hpx/traits/future_traits.hpp>
 #include <hpx/traits/is_future.hpp>
 #include <hpx/traits/is_tuple_like.hpp>
-#include <hpx/util/identity.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/pack_traversal.hpp>
