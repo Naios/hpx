@@ -64,11 +64,20 @@ namespace util {
                 std::is_void<
                     typename traits::future_traits<T>::result_type>::value>;
 
-        template <typename Config>
-        struct unwrap_base;
+        /// A mapper that maps futures to its representing type
+        ///
+        /// The mapper does unwrap futures nested inside futures until
+        /// the particular given depth.
+        ///
+        /// - Depth >  1 -> Depth remaining
+        /// - Depth == 1 -> One depth remaining
+        /// - Depth == 0 -> Unlimited depths
+        template <std::size_t Depth, typename Config>
+        struct future_unwrap_until_depth;
 
-        template <bool AllowVoidFutures, bool UnwrapTopLevelTuples>
-        struct unwrap_base<
+        template <std::size_t Depth, bool AllowVoidFutures,
+            bool UnwrapTopLevelTuples>
+        struct future_unwrap_until_depth<Depth,
             unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>
         {
             template <typename T,
@@ -82,20 +91,6 @@ namespace util {
                 std::forward<T>(future).get();
                 return {};
             }
-        };
-
-        /// A mapper that maps futures to its representing type
-        ///
-        /// The mapper does unwrap futures nested inside futures until
-        /// the particular given depth.
-        ///
-        /// - Depth >  1 -> Depth remaining
-        /// - Depth == 1 -> One depth remaining
-        /// - Depth == 0 -> Unlimited depths
-        template <std::size_t Depth, typename Config>
-        struct future_unwrap_until_depth : unwrap_base<Config>
-        {
-            using unwrap_base<Config>::operator();
 
             template <typename T,
                 typename std::enable_if<is_non_void_future<
@@ -108,10 +103,21 @@ namespace util {
                     std::forward<T>(future).get());
             }
         };
-        template <typename Config>
-        struct future_unwrap_until_depth<1U, Config> : unwrap_base<Config>
+        template <bool AllowVoidFutures, bool UnwrapTopLevelTuples>
+        struct future_unwrap_until_depth<1U,
+            unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>
         {
-            using unwrap_base<Config>::operator();
+            template <typename T,
+                typename std::enable_if<is_void_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
+            unwrapped_void_tag operator()(T&& future) const
+            {
+                static_assert(AllowVoidFutures && std::is_same<T, T>::value,
+                    "Unwrapping future<void> or shared_future<void> is "
+                    "forbidden! Use hpx::lcos::wait_all instead!");
+                std::forward<T>(future).get();
+                return {};
+            }
 
             template <typename T,
                 typename std::enable_if<is_non_void_future<
@@ -122,10 +128,21 @@ namespace util {
                 return std::forward<T>(future).get();
             }
         };
-        template <typename Config>
-        struct future_unwrap_until_depth<0U, Config> : unwrap_base<Config>
+        template <bool AllowVoidFutures, bool UnwrapTopLevelTuples>
+        struct future_unwrap_until_depth<0U,
+            unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>
         {
-            using unwrap_base<Config>::operator();
+            template <typename T,
+                typename std::enable_if<is_void_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
+            unwrapped_void_tag operator()(T&& future) const
+            {
+                static_assert(AllowVoidFutures && std::is_same<T, T>::value,
+                    "Unwrapping future<void> or shared_future<void> is "
+                    "forbidden! Use hpx::lcos::wait_all instead!");
+                std::forward<T>(future).get();
+                return {};
+            }
 
             template <typename T,
                 typename std::enable_if<is_non_void_future<
