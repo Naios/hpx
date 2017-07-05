@@ -98,7 +98,7 @@ namespace hpx { namespace components
                 values.push_back(counter.get_value<std::uint64_t>());
 
             return hpx::dataflow(hpx::launch::sync,
-                hpx::util::unwrap(
+                hpx::util::unwrapping(
                     [](std::vector<std::uint64_t> && values)
                     {
                         return values;

@@ -73,7 +73,7 @@ namespace hpx { namespace parallel { inline namespace v1
                         return util::accumulate_n(++part_begin, --part_size,
                             std::move(val), r);
                     },
-                    hpx::util::unwrap([init, r](std::vector<T> && results)
+                    hpx::util::unwrapping([init, r](std::vector<T> && results)
                     {
                         return util::accumulate_n(boost::begin(results),
                             boost::size(results), init, r);

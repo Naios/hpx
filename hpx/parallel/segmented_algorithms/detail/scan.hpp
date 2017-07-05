@@ -102,7 +102,7 @@ namespace hpx { namespace parallel { inline namespace v1
                         }
                         return ret;
                     },
-                    hpx::util::unwrap(
+                    hpx::util::unwrapping(
                         [op, policy](std::vector<T>&& results) -> T
                         {
                             HPX_UNUSED(policy);
@@ -636,7 +636,7 @@ namespace hpx { namespace parallel { inline namespace v1
                 finalitems.push_back(
                     hpx::dataflow(
                         policy.executor(),
-                        hpx::util::unwrap(
+                        hpx::util::unwrapping(
                             [=, &op](T last_value, T)
                             {
                                 dispatch(traits_out::get_id(out_it),
@@ -655,7 +655,7 @@ namespace hpx { namespace parallel { inline namespace v1
                 workitems.push_back(
                     hpx::dataflow(
                         policy.executor(),
-                        hpx::util::unwrap(op),
+                        hpx::util::unwrapping(op),
                         workitems.back(),
                         res
                     )
@@ -784,7 +784,7 @@ namespace hpx { namespace parallel { inline namespace v1
                 finalitems.push_back(
                     hpx::dataflow(
                         policy.executor(),
-                        hpx::util::unwrap(
+                        hpx::util::unwrapping(
                             [&, dest](T last_value, vector_type r)
                             {
                                 // merge function
@@ -801,11 +801,11 @@ namespace hpx { namespace parallel { inline namespace v1
                 workitems.push_back(
                     hpx::dataflow(
                         policy.executor(),
-                        hpx::util::unwrap(op),
+                        hpx::util::unwrapping(op),
                         workitems.back(),
                         execution::async_execute(
                             policy.executor(),
-                            hpx::util::unwrap(f2),
+                            hpx::util::unwrapping(f2),
                             res
                         )
                     )

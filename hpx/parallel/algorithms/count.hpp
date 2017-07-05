@@ -145,7 +145,7 @@ namespace hpx { namespace parallel { inline namespace v1
                     std::forward<ExPolicy>(policy),
                     first, std::distance(first, last),
                     std::move(f1),
-                    hpx::util::unwrap(
+                    hpx::util::unwrapping(
                         [](std::vector<difference_type>&& results)
                         {
                             return util::accumulate_n(
@@ -300,7 +300,7 @@ namespace hpx { namespace parallel { inline namespace v1
                     std::forward<ExPolicy>(policy),
                     first, std::distance(first, last),
                     std::move(f1),
-                    hpx::util::unwrap(
+                    hpx::util::unwrapping(
                         [](std::vector<difference_type> && results)
                         {
                             return util::accumulate_n(
