@@ -260,7 +260,7 @@ struct stepper
         partition const& middle, partition const& right)
     {
         using hpx::dataflow;
-        using hpx::util::unwrapped;
+        using hpx::util::unwrapping;
 
         hpx::shared_future<partition_data> middle_data =
             middle.get_data(partition_server::middle_partition);

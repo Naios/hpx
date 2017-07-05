@@ -224,7 +224,7 @@ struct stepper
         partition const& right)
     {
         using hpx::dataflow;
-        using hpx::util::unwrapped;
+        using hpx::util::unwrapping;
 
         return dataflow(
             unwrapping(
