@@ -49,6 +49,21 @@ namespace util {
         {
         };
 
+        /// Deduces to a true_type if the given future is instantiated with
+        /// a non void type.
+        template <typename T>
+        using is_non_void_future = std::integral_constant<bool,
+            traits::is_future<T>::value &&
+                !std::is_void<
+                    typename traits::future_traits<T>::result_type>::value>;
+
+        /// Deduces to a true_type if the given future is instantiated with void
+        template <typename T>
+        using is_void_future = std::integral_constant<bool,
+            traits::is_future<T>::value &&
+                std::is_void<
+                    typename traits::future_traits<T>::result_type>::value>;
+
         template <typename Config>
         struct unwrap_base;
 
@@ -57,11 +72,8 @@ namespace util {
             unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>
         {
             template <typename T,
-                typename std::enable_if<
-                    traits::is_future<typename std::decay<T>::type>::value &&
-                    std::is_void<typename traits::future_traits<
-                        typename std::decay<T>::type>::result_type>::value>::
-                    type* = nullptr>
+                typename std::enable_if<is_void_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
             unwrapped_void_tag operator()(T&& future) const
             {
                 static_assert(AllowVoidFutures && std::is_same<T, T>::value,
@@ -86,11 +98,8 @@ namespace util {
             using unwrap_base<Config>::operator();
 
             template <typename T,
-                typename std::enable_if<
-                    traits::is_future<typename std::decay<T>::type>::value &&
-                    !std::is_void<typename traits::future_traits<
-                        typename std::decay<T>::type>::result_type>::value>::
-                    type* = nullptr>
+                typename std::enable_if<is_non_void_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
             auto operator()(T&& future) const -> decltype(
                 map_pack(future_unwrap_until_depth<Depth - 1, Config>{},
                     std::forward<T>(future).get()))
@@ -105,11 +114,8 @@ namespace util {
             using unwrap_base<Config>::operator();
 
             template <typename T,
-                typename std::enable_if<
-                    traits::is_future<typename std::decay<T>::type>::value &&
-                    !std::is_void<typename traits::future_traits<
-                        typename std::decay<T>::type>::result_type>::value>::
-                    type* = nullptr>
+                typename std::enable_if<is_non_void_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
             auto operator()(T&& future) const -> typename traits::future_traits<
                 typename std::decay<T>::type>::result_type
             {
@@ -122,11 +128,8 @@ namespace util {
             using unwrap_base<Config>::operator();
 
             template <typename T,
-                typename std::enable_if<
-                    traits::is_future<typename std::decay<T>::type>::value &&
-                    !std::is_void<typename traits::future_traits<
-                        typename std::decay<T>::type>::result_type>::value>::
-                    type* = nullptr>
+                typename std::enable_if<is_non_void_future<
+                    typename std::decay<T>::type>::value>::type* = nullptr>
             auto operator()(T&& future) const -> decltype(
                 map_pack(std::declval<future_unwrap_until_depth const&>(),
                     std::forward<T>(future).get()))
