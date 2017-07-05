@@ -6,6 +6,7 @@
 #include <hpx/config.hpp>
 #include <hpx/error_code.hpp>
 #include <hpx/lcos/future.hpp>
+#include <hpx/lcos/wait_all.hpp>
 #include <hpx/performance_counters/performance_counter_set.hpp>
 #include <hpx/performance_counters/stubs/performance_counter.hpp>
 #include <hpx/runtime/get_locality_id.hpp>
@@ -241,7 +242,7 @@ namespace hpx { namespace performance_counters
     void performance_counter_set::reset(launch::sync_policy, error_code& ec)
     {
         try {
-            hpx::util::unwrap(reset());
+            hpx::lcos::wait_all(reset());
         }
         catch (hpx::exception const& e) {
             HPX_RETHROWS_IF(ec, e, "performance_counter_set::start");
