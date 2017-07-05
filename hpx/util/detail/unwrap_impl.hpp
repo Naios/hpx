@@ -95,11 +95,14 @@ namespace util {
             template <typename T,
                 typename std::enable_if<is_non_void_future<
                     typename std::decay<T>::type>::value>::type* = nullptr>
-            auto operator()(T&& future) const -> decltype(
-                map_pack(future_unwrap_until_depth<Depth - 1, Config>{},
-                    std::forward<T>(future).get()))
+            auto operator()(T&& future) const -> decltype(map_pack(
+                future_unwrap_until_depth<Depth - 1,
+                    unwrap_config<AllowVoidFutures, UnwrapTopLevelTuples>>{},
+                std::forward<T>(future).get()))
             {
-                return map_pack(future_unwrap_until_depth<Depth - 1, Config>{},
+                return map_pack(future_unwrap_until_depth<Depth - 1,
+                                    unwrap_config<AllowVoidFutures,
+                                        UnwrapTopLevelTuples>>{},
                     std::forward<T>(future).get());
             }
         };
