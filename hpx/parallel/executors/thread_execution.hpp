@@ -19,7 +19,7 @@
 #include <hpx/util/detail/pack.hpp>
 #include <hpx/util/deferred_call.hpp>
 #include <hpx/util/tuple.hpp>
-#include <hpx/util/unwrapped.hpp>
+#include <hpx/util/unwrap.hpp>
 
 #include <hpx/parallel/executors/execution.hpp>
 
@@ -175,7 +175,7 @@ namespace hpx { namespace threads
                 elem, ts...));
         }
 
-        return hpx::util::unwrapped(results);
+        return hpx::util::unwrap(results);
     }
 
     ///////////////////////////////////////////////////////////////////////////

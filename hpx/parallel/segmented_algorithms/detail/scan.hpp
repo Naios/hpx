@@ -16,7 +16,7 @@
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/tuple.hpp>
 #include <hpx/util/unused.hpp>
-#include <hpx/util/unwrapped.hpp>
+#include <hpx/util/unwrap.hpp>
 #include <hpx/util/void_guard.hpp>
 
 #include <hpx/parallel/algorithms/detail/dispatch.hpp>
@@ -102,7 +102,7 @@ namespace hpx { namespace parallel { inline namespace v1
                         }
                         return ret;
                     },
-                    hpx::util::unwrapped(
+                    hpx::util::unwrap(
                         [op, policy](std::vector<T>&& results) -> T
                         {
                             HPX_UNUSED(policy);
@@ -636,7 +636,7 @@ namespace hpx { namespace parallel { inline namespace v1
                 finalitems.push_back(
                     hpx::dataflow(
                         policy.executor(),
-                        hpx::util::unwrapped(
+                        hpx::util::unwrap(
                             [=, &op](T last_value, T)
                             {
                                 dispatch(traits_out::get_id(out_it),
@@ -655,7 +655,7 @@ namespace hpx { namespace parallel { inline namespace v1
                 workitems.push_back(
                     hpx::dataflow(
                         policy.executor(),
-                        hpx::util::unwrapped(op),
+                        hpx::util::unwrap(op),
                         workitems.back(),
                         res
                     )
@@ -784,7 +784,7 @@ namespace hpx { namespace parallel { inline namespace v1
                 finalitems.push_back(
                     hpx::dataflow(
                         policy.executor(),
-                        hpx::util::unwrapped(
+                        hpx::util::unwrap(
                             [&, dest](T last_value, vector_type r)
                             {
                                 // merge function
@@ -801,11 +801,11 @@ namespace hpx { namespace parallel { inline namespace v1
                 workitems.push_back(
                     hpx::dataflow(
                         policy.executor(),
-                        hpx::util::unwrapped(op),
+                        hpx::util::unwrap(op),
                         workitems.back(),
                         execution::async_execute(
                             policy.executor(),
-                            hpx::util::unwrapped(f2),
+                            hpx::util::unwrap(f2),
                             res
                         )
                     )

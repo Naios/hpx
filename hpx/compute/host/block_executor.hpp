@@ -16,7 +16,7 @@
 #include <hpx/traits/executor_traits.hpp>
 #include <hpx/traits/is_executor.hpp>
 #include <hpx/util/deferred_call.hpp>
-#include <hpx/util/unwrapped.hpp>
+#include <hpx/util/unwrap.hpp>
 
 #include <boost/atomic.hpp>
 #include <boost/range/iterator_range_core.hpp>

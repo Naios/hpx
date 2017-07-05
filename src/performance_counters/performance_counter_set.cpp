@@ -12,7 +12,7 @@
 #include <hpx/runtime/launch_policy.hpp>
 #include <hpx/runtime_fwd.hpp>
 #include <hpx/util/bind.hpp>
-#include <hpx/util/unwrapped.hpp>
+#include <hpx/util/unwrap.hpp>
 
 #include <boost/format.hpp>
 
@@ -173,7 +173,7 @@ namespace hpx { namespace performance_counters
     bool performance_counter_set::start(launch::sync_policy, error_code& ec)
     {
         try {
-            auto v = hpx::util::unwrapped(start());
+            auto v = hpx::util::unwrap(start());
             return std::all_of(v.begin(), v.end(), [](bool val) { return val; });
         }
         catch (hpx::exception const& e) {
@@ -207,7 +207,7 @@ namespace hpx { namespace performance_counters
     bool performance_counter_set::stop(launch::sync_policy, error_code& ec)
     {
         try {
-            auto v = hpx::util::unwrapped(stop());
+            auto v = hpx::util::unwrap(stop());
             return std::all_of(v.begin(), v.end(), [](bool val) { return val; });
         }
         catch (hpx::exception const& e) {
@@ -241,7 +241,7 @@ namespace hpx { namespace performance_counters
     void performance_counter_set::reset(launch::sync_policy, error_code& ec)
     {
         try {
-            hpx::util::unwrapped(reset());
+            hpx::util::unwrap(reset());
         }
         catch (hpx::exception const& e) {
             HPX_RETHROWS_IF(ec, e, "performance_counter_set::start");
@@ -280,7 +280,7 @@ namespace hpx { namespace performance_counters
         launch::sync_policy, bool reset, error_code& ec) const
     {
         try {
-            return hpx::util::unwrapped(get_counter_values(reset));
+            return hpx::util::unwrap(get_counter_values(reset));
         }
         catch (hpx::exception const& e) {
             HPX_RETHROWS_IF(ec, e,
@@ -322,7 +322,7 @@ namespace hpx { namespace performance_counters
             launch::sync_policy, bool reset, error_code& ec) const
     {
         try {
-            return hpx::util::unwrapped(get_counter_values_array(reset));
+            return hpx::util::unwrap(get_counter_values_array(reset));
         }
         catch (hpx::exception const& e) {
             HPX_RETHROWS_IF(ec, e,
