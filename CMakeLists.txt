@@ -1642,6 +1642,11 @@ hpx_include(Documentation)
 set(CMAKE_DEBUG_POSTFIX "d")
 set(HPX_DEBUG_POSTFIX "d")
 
+add_executable(mylightunwraptest ${PROJECT_SOURCE_DIR}/mylightunwraptest.cpp)
+target_compile_definitions(mylightunwraptest
+  PUBLIC
+    HPX_NO_VERSION_CHECK)
+
 ################################################################################
 # Target specification
 ################################################################################
