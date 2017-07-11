@@ -11,6 +11,7 @@
 #include <hpx/traits/is_range.hpp>
 #include <hpx/traits/is_tuple_like.hpp>
 #include <hpx/util/always_void.hpp>
+#include <hpx/util/detail/pack.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/result_of.hpp>
@@ -24,6 +25,34 @@
 
 namespace hpx {
 namespace util {
+    namespace detail {
+        /// A tag to mark a tuple to be flat
+        struct flat_tag
+        {
+        };
+        /// The flatted type of a given tuple
+        template <typename... T>
+        using flat_tuple_t = tuple<flat_tag, T...>;
+
+        /// Deduces to a true_type if the fiven type is a flat tuple
+        template <typename T>
+        struct is_flat : std::false_type
+        {
+        };
+        template <typename... T>
+        struct is_flat<flat_tuple_t<T...>> : std::true_type
+        {
+        };
+    }    // end namespace detail
+
+    /// Indicate that the result shall be spread across the parent container
+    /// if possible.
+    template <typename... T>
+    detail::flat_tuple_t<T...> flatten_this(T&&... args)
+    {
+        return detail::flat_tuple_t<T...>{{}, std::forward<T>(args)...};
+    }
+
     namespace detail {
         /// Just traverses the pack with the given callable object,
         /// no result is returned or preserved.
