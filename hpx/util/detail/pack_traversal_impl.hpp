@@ -26,13 +26,23 @@
 namespace hpx {
 namespace util {
     namespace detail {
-        /// A tag to mark a tuple to be flat
-        struct flat_tag
+        /// A struct to mark a tuple to be unpacked into the parent context
+        template <typename T>
+        class flat_box
         {
+            tuple<T...> boxed_;
+
+        public:
+            explicit flat_box(T... args)
+              : boxed_(std::move<T>(args)...)
+            {
+            }
+
+            tuple<T...> unbox()
+            {
+                return std::move(boxed_);
+            }
         };
-        /// The flatted type of a given tuple
-        template <typename... T>
-        using flat_tuple_t = tuple<flat_tag, T...>;
 
         /// Deduces to a true_type if the fiven type is a flat tuple
         template <typename T>
@@ -40,17 +50,28 @@ namespace util {
         {
         };
         template <typename... T>
-        struct is_flat<flat_tuple_t<T...>> : std::true_type
+        struct is_flat<flat_box<T...>> : std::true_type
         {
+        };
+
+        template <typename T>
+        T unpack(T&& type)
+        {
+            return std::forward<T>(type);
+        };
+        template <typename... T>
+        auto unpack(flat_box<T...> type) -> decltype(type.unpack())
+        {
+            return type.unpack();
         };
     }    // end namespace detail
 
     /// Indicate that the result shall be spread across the parent container
     /// if possible.
     template <typename... T>
-    detail::flat_tuple_t<T...> flatten_this(T&&... args)
+    detail::flat_box<T...> flatten_this(T&&... args)
     {
-        return detail::flat_tuple_t<T...>{{}, std::forward<T>(args)...};
+        return detail::flat_box<T...>{std::forward<T>(args)...};
     }
 
     namespace detail {
