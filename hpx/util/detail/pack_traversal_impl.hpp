@@ -35,8 +35,9 @@ namespace util {
                 tuple<T...> boxed_;
 
             public:
-                explicit spread_box(T... args)
-                  : boxed_(std::move<T>(args)...)
+                template <typename... C>
+                explicit spread_box(C&&... args)
+                  : boxed_(std::forward<C>(args)...)
                 {
                 }
 
@@ -70,11 +71,12 @@ namespace util {
     }        // end namespace detail
 
     /// Indicate that the result shall be spread across the parent container
-    /// if possible.
+    /// if possible. This can be used to create a mapper function used
+    /// in map_pack that maps one element to an arbitrary count (1:n).
     template <typename... T>
-    detail::spreading::spread_box<T...> flatten_this(T&&... args)
+    detail::spreading::spread_box<T...> spread_this(T&&... args)
     {
-        return {std::forward<T>(args)...};
+        return detail::spreading::spread_box<T...>{std::forward<T>(args)...};
     }
 
     namespace detail {
