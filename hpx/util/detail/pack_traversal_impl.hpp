@@ -69,6 +69,11 @@ namespace util {
                 return type.unbox();
             }
 
+            /// Deduces to the type unpack is returning when called with the
+            /// the given type T.
+            template <typename T>
+            using unpacked_of_t = decltype(unpack(std::declval<T>()));
+
             /// Converts types to the type and spread_box objects to its
             /// underlying tuple. If the type is mapped to zero elements,
             /// the return type will be void.
@@ -78,7 +83,7 @@ namespace util {
             {
                 return unpack(std::forward<T>(type));
             }
-            void unpack_or_void(spread_box<>)
+            inline void unpack_or_void(spread_box<>)
             {
             }
 
@@ -153,7 +158,6 @@ namespace util {
                 // Check whether any of the args is a detail::flatted_tuple_t,
                 // if not, use the linear called version for better
                 // compilation speed.
-                // TODO Maybe short circuit this
                 return apply_spread_impl(is_any_spread_t<T...>{},
                     std::forward<C>(callable), std::forward<T>(args)...);
             }
@@ -174,10 +178,14 @@ namespace util {
             {
                 return std::move(val);
             }
-            void voidify_empty_tuple(tuple<>)
+            inline void voidify_empty_tuple(tuple<>)
             {
             }
 
+            /// Converts the given variadic arguments into a tuple in a way
+            /// that spread return values are inserted into the current pack.
+            ///
+            /// If the returned tuple is empty, voidis returned instead.
             template <typename... T>
             auto tupelize_or_void(T&&... args) -> decltype(
                 voidify_empty_tuple(tupelize(std::forward<T>(args)...)))
@@ -409,7 +417,8 @@ namespace util {
             /// version.
             template <typename Container, typename Mapping>
             using mapped_type_from_t = dereferenced_of_t<
-                typename invoke_result<Mapping, element_of_t<Container>>::type>;
+                spreading::unpacked_of_t<typename invoke_result<Mapping,
+                    element_of_t<Container>>::type>>;
 
             /// We create a new container, which may hold the resulting type
             template <typename M, typename T>
@@ -439,8 +448,8 @@ namespace util {
                 for (auto&& val :
                     container_accessor_of(std::forward<T>(container)))
                 {
-                    remapped.push_back(std::forward<M>(mapper)(
-                        std::forward<decltype(val)>(val)));
+                    remapped.push_back(spreading::unpack(std::forward<M>(
+                        mapper)(std::forward<decltype(val)>(val))));
                 }
 
                 return remapped;    // RVO
