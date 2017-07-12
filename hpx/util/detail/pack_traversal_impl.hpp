@@ -26,52 +26,55 @@
 namespace hpx {
 namespace util {
     namespace detail {
-        /// A struct to mark a tuple to be unpacked into the parent context
-        template <typename T>
-        class flat_box
-        {
-            tuple<T...> boxed_;
-
-        public:
-            explicit flat_box(T... args)
-              : boxed_(std::move<T>(args)...)
+        /// Exposes useful facilities for dealing with 1:n mappings
+        namespace spreading {
+            /// A struct to mark a tuple to be unpacked into the parent context
+            template <typename... T>
+            class spread_box
             {
-            }
+                tuple<T...> boxed_;
 
-            tuple<T...> unbox()
+            public:
+                explicit spread_box(T... args)
+                  : boxed_(std::move<T>(args)...)
+                {
+                }
+
+                tuple<T...> unbox()
+                {
+                    return std::move(boxed_);
+                }
+            };
+
+            /// Deduces to a true_type if the fiven type is a flat tuple
+            template <typename T>
+            struct is_spread : std::false_type
             {
-                return std::move(boxed_);
-            }
-        };
+            };
+            template <typename... T>
+            struct is_spread<spread_box<T...>> : std::true_type
+            {
+            };
 
-        /// Deduces to a true_type if the fiven type is a flat tuple
-        template <typename T>
-        struct is_flat : std::false_type
-        {
-        };
-        template <typename... T>
-        struct is_flat<flat_box<T...>> : std::true_type
-        {
-        };
-
-        template <typename T>
-        T unpack(T&& type)
-        {
-            return std::forward<T>(type);
-        };
-        template <typename... T>
-        auto unpack(flat_box<T...> type) -> decltype(type.unpack())
-        {
-            return type.unpack();
-        };
-    }    // end namespace detail
+            template <typename T>
+            T unpack(T&& type)
+            {
+                return std::forward<T>(type);
+            };
+            template <typename... T>
+            auto unpack(spread_box<T...> type) -> decltype(type.unpack())
+            {
+                return type.unpack();
+            };
+        }    // end namespace spreading
+    }        // end namespace detail
 
     /// Indicate that the result shall be spread across the parent container
     /// if possible.
     template <typename... T>
-    detail::flat_box<T...> flatten_this(T&&... args)
+    detail::spreading::spread_box<T...> flatten_this(T&&... args)
     {
-        return detail::flat_box<T...>{std::forward<T>(args)...};
+        return {std::forward<T>(args)...};
     }
 
     namespace detail {
