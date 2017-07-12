@@ -69,6 +69,19 @@ namespace util {
                 return type.unbox();
             }
 
+            /// Converts types to the type and spread_box objects to its
+            /// underlying tuple. If the type is mapped to zero elements,
+            /// the return type will be void.
+            template <typename T>
+            auto unpack_or_void(T&& type)
+                -> decltype(unpack(std::forward<T>(type)))
+            {
+                return unpack(std::forward<T>(type));
+            }
+            void unpack_or_void(spread_box<>)
+            {
+            }
+
             /// Converts types to the a tuple carrying the single type and
             /// spread_box objects to its underlying tuple.
             template <typename T>
@@ -153,6 +166,23 @@ namespace util {
             {
                 return map_spread(
                     functional_tupelize_tag{}, std::forward<T>(args)...);
+            }
+
+            /// Converts an empty tuple to void
+            template <typename First, typename... Rest>
+            tuple<First, Rest...> voidify_empty_tuple(tuple<First, Rest...> val)
+            {
+                return std::move(val);
+            }
+            void voidify_empty_tuple(tuple<>)
+            {
+            }
+
+            template <typename... T>
+            auto tupelize_or_void(T&&... args) -> decltype(
+                voidify_empty_tuple(tupelize(std::forward<T>(args)...)))
+            {
+                return voidify_empty_tuple(tupelize(std::forward<T>(args)...));
             }
         }    // end namespace spreading
     }        // end namespace detail
@@ -812,13 +842,6 @@ namespace util {
                     std::forward<T>(element));
             }
 
-            /// Boxes the given values into an according tuple
-            template <typename... T>
-            tuple<T...> box(T&&... args)
-            {
-                return tuple<T...>{std::forward<T>(args)...};
-            }
-
         public:
             explicit mapping_helper(M mapper)
               : mapper_(std::move(mapper))
@@ -827,11 +850,18 @@ namespace util {
 
             /// \copybrief try_traverse
             template <typename T>
-            auto init_traverse(Strategy strategy, T&& element)
-                -> decltype(std::declval<mapping_helper>().try_traverse(
-                    strategy, std::declval<T>()))
+            auto init_traverse(strategy_remap_tag, T&& element)
+                -> decltype(spreading::unpack_or_void(
+                    std::declval<mapping_helper>().try_traverse(
+                        strategy_remap_tag{}, std::declval<T>())))
             {
-                return try_traverse(strategy, std::forward<T>(element));
+                return spreading::unpack_or_void(try_traverse(
+                    strategy_remap_tag{}, std::forward<T>(element)));
+            }
+            template <typename T>
+            void init_traverse(strategy_traverse_tag, T&& element)
+            {
+                try_traverse(strategy_traverse_tag{}, std::forward<T>(element));
             }
 
             /// Calls the traversal method for every element in the pack,
@@ -839,7 +869,7 @@ namespace util {
             template <typename First, typename Second, typename... T>
             auto init_traverse(strategy_remap_tag strategy, First&& first,
                 Second&& second, T&&... rest)
-                -> decltype(std::declval<mapping_helper>().box(
+                -> decltype(spreading::tupelize_or_void(
                     std::declval<mapping_helper>().try_traverse(
                         strategy, std::forward<First>(first)),
                     std::declval<mapping_helper>().try_traverse(
@@ -847,7 +877,8 @@ namespace util {
                     std::declval<mapping_helper>().try_traverse(
                         strategy, std::forward<T>(rest))...))
             {
-                return box(try_traverse(strategy, std::forward<First>(first)),
+                return spreading::tupelize_or_void(
+                    try_traverse(strategy, std::forward<First>(first)),
                     try_traverse(strategy, std::forward<Second>(second)),
                     try_traverse(strategy, std::forward<T>(rest))...);
             }
