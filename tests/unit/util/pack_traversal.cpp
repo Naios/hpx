@@ -748,6 +748,57 @@ static void testStrategicTupleLikeTraverse()
     }
 }
 
+/// A mapper which duplicates the given element
+struct duplicate_mapper
+{
+    template <typename T>
+    auto operator()(T arg) -> decltype(hpx::util::spread_this(arg, arg))
+    {
+        return hpx::util::spread_this(arg, arg);
+    }
+};
+
+/// A mapper which removes the current element
+struct zero_mapper
+{
+    template <typename T>
+    auto operator()(T arg) -> decltype(hpx::util::spread_this())
+    {
+        return hpx::util::spread_this();
+    }
+};
+
+static void testSpreadTraverse()
+{
+    // 1:2 mappings (multiple arguments)
+    {
+        tuple<int, int, float, float> res =
+            map_pack(duplicate_mapper{}, 1, 1.f);
+
+        auto expected = make_tuple(1, 1, 1.f, 1.f);
+
+        HPX_TEST((res == expected));
+    }
+
+    // 1:0 mappings
+    {
+        map_pack(zero_mapper{}, 1, 1.f);
+
+        using Result = decltype(map_pack(zero_mapper{}, 1, 1.f));
+
+        /// We expect a void result if all elements were reoved by the mapping
+        HPX_TEST((std::is_void<Result>::value));
+    }
+}
+
+static void testSpreadContainerTraverse()
+{
+}
+
+static void testSpreadTupleLikeTraverse()
+{
+}
+
 int main(int, char**)
 {
     testMixedTraversal();
@@ -758,6 +809,10 @@ int main(int, char**)
     testStrategicTraverse();
     testStrategicContainerTraverse();
     testStrategicTupleLikeTraverse();
+
+    testSpreadTraverse();
+    testSpreadContainerTraverse();
+    testSpreadTupleLikeTraverse();
 
     return hpx::util::report_errors();
 }
