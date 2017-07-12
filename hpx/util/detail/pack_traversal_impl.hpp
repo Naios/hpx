@@ -57,16 +57,32 @@ namespace util {
             {
             };
 
+            /// Converts types to the type and spread_box objects to its
+            /// underlying tuple.
             template <typename T>
             T unpack(T&& type)
             {
                 return std::forward<T>(type);
-            };
+            }
             template <typename... T>
             auto unpack(spread_box<T...> type) -> decltype(type.unpack())
             {
                 return type.unpack();
-            };
+            }
+
+            /// Converts types to the a tuple carrying the single type and
+            /// spread_box objects to its underlying tuple.
+            template <typename T>
+            auto undecorate(T&& type)
+                -> decltype(make_tuple(std::forward<T>(type)))
+            {
+                return make_tuple(std::forward<T>(type));
+            }
+            template <typename... T>
+            auto undecorate(spread_box<T...> type) -> decltype(type.unpack())
+            {
+                return type.unpack();
+            }
         }    // end namespace spreading
     }        // end namespace detail
 

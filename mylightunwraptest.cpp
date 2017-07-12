@@ -5,6 +5,17 @@ namespace hpx {
 namespace util {
     namespace detail {
         namespace spreading {
+            /// Use the recursive instantiation for a variadic pack which
+            /// may contain spread types
+            template <typename C, typename... T>
+            auto apply_spread_impl(std::true_type, C&& callable, T&&... args)
+                -> decltype(invoke_fused(std::forward<C>(callable),
+                    tuple_cat(undecorate(std::forward<T>(args))...)))
+            {
+                return invoke_fused(std::forward<C>(callable),
+                    tuple_cat(undecorate(std::forward<T>(args))...));
+            }
+
             /// Use the linear instantiation for variadic packs which don't
             /// contain spread types.
             template <typename C, typename... T>
@@ -15,13 +26,6 @@ namespace util {
                     std::forward<C>(callable), std::forward<T>(args)...);
             }
 
-            /// Use the recursive instantiation for a variadic pack which
-            /// may contain spread types
-            template <typename C, typename... T>
-            void apply_spread_impl(std::true_type, C&& callable, T&&... args)
-            {
-            }
-
             /// Deduces to a true_type if any of the given types marks
             /// the underlying type to be spread into the current context.
             template <typename... T>
@@ -29,8 +33,8 @@ namespace util {
 
             template <typename C, typename... T>
             auto apply_spread(C&& callable, T&&... args)
-            /*-> decltype(apply_spread_impl(is_any_spread_t<T...>{},
-                    std::forward<C>(callable), std::forward<T>(args)...))*/
+                -> decltype(apply_spread_impl(is_any_spread_t<T...>{},
+                    std::forward<C>(callable), std::forward<T>(args)...))
             {
                 // Check whether any of the args is a detail::flatted_tuple_t,
                 // if not, use the linear called version for better
@@ -51,8 +55,8 @@ namespace util {
             };
 
             template <typename... T>
-            auto tupelize(T&&... args) /*-> decltype(
-                apply_spread(functional_tupelize{}, std::forward<T>(args)...))*/
+            auto tupelize(T&&... args) -> decltype(
+                apply_spread(functional_tupelize{}, std::forward<T>(args)...))
             {
                 return apply_spread(
                     functional_tupelize{}, std::forward<T>(args)...);
