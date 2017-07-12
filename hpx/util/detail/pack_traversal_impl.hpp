@@ -464,8 +464,8 @@ namespace util {
                 for (auto&& val :
                     container_accessor_of(std::forward<T>(container)))
                 {
-                    val = std::forward<M>(mapper)(
-                        std::forward<decltype(val)>(val));
+                    val = spreading::unpack(std::forward<M>(mapper)(
+                        std::forward<decltype(val)>(val)));
                 }
                 return std::forward<T>(container);
             }
