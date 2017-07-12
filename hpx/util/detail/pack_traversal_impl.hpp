@@ -35,9 +35,8 @@ namespace util {
                 tuple<T...> boxed_;
 
             public:
-                template <typename... C>
-                explicit spread_box(C&&... args)
-                  : boxed_(std::forward<C>(args)...)
+                explicit spread_box(tuple<T...> boxed)
+                  : boxed_(std::move(boxed))
                 {
                 }
 
@@ -65,9 +64,9 @@ namespace util {
                 return std::forward<T>(type);
             }
             template <typename... T>
-            auto unpack(spread_box<T...> type) -> decltype(type.unpack())
+            auto unpack(spread_box<T...> type) -> decltype(type.unbox())
             {
-                return type.unpack();
+                return type.unbox();
             }
 
             /// Converts types to the a tuple carrying the single type and
@@ -79,9 +78,81 @@ namespace util {
                 return make_tuple(std::forward<T>(type));
             }
             template <typename... T>
-            auto undecorate(spread_box<T...> type) -> decltype(type.unpack())
+            auto undecorate(spread_box<T...> type) -> decltype(type.unbox())
             {
-                return type.unpack();
+                return type.unbox();
+            }
+
+            /// A tag for mapping the arguments to a tuple
+            struct functional_tupelize_tag
+            {
+            };
+
+            /// Use the recursive instantiation for a variadic pack which
+            /// may contain spread types
+            template <typename C, typename... T>
+            auto apply_spread_impl(std::true_type, C&& callable, T&&... args)
+                -> decltype(invoke_fused(std::forward<C>(callable),
+                    tuple_cat(undecorate(std::forward<T>(args))...)))
+            {
+                return invoke_fused(std::forward<C>(callable),
+                    tuple_cat(undecorate(std::forward<T>(args))...));
+            }
+            template <typename... T>
+            auto apply_spread_impl(
+                std::true_type, functional_tupelize_tag, T&&... args)
+                -> decltype(tuple_cat(undecorate(std::forward<T>(args))...))
+            {
+                // Optimized version to prevent useless tuple
+                // unpacking and re-assembling
+                return tuple_cat(undecorate(std::forward<T>(args))...);
+            }
+
+            /// Use the linear instantiation for variadic packs which don't
+            /// contain spread types.
+            template <typename C, typename... T>
+            auto apply_spread_impl(std::false_type, C&& callable, T&&... args)
+                -> typename invoke_result<C, T...>::type
+            {
+                return invoke(
+                    std::forward<C>(callable), std::forward<T>(args)...);
+            }
+            template <typename... T>
+            tuple<T...> apply_spread_impl(
+                std::false_type, functional_tupelize_tag, T&&... args)
+
+            {
+                // Optimized version to prevent useless tuple
+                // unpacking and re-assembling
+                return tuple<T...>{std::forward<T>(args)...};
+            }
+
+            /// Deduces to a true_type if any of the given types marks
+            /// the underlying type to be spread into the current context.
+            template <typename... T>
+            using is_any_spread_t = any_of<is_spread<T>...>;
+
+            template <typename C, typename... T>
+            auto map_spread(C&& callable, T&&... args)
+                -> decltype(apply_spread_impl(is_any_spread_t<T...>{},
+                    std::forward<C>(callable), std::forward<T>(args)...))
+            {
+                // Check whether any of the args is a detail::flatted_tuple_t,
+                // if not, use the linear called version for better
+                // compilation speed.
+                // TODO Maybe short circuit this
+                return apply_spread_impl(is_any_spread_t<T...>{},
+                    std::forward<C>(callable), std::forward<T>(args)...);
+            }
+
+            /// Converts the given variadic arguments into a tuple in a way
+            /// that spread return values are inserted into the current pack.
+            template <typename... T>
+            auto tupelize(T&&... args) -> decltype(
+                map_spread(functional_tupelize_tag{}, std::forward<T>(args)...))
+            {
+                return map_spread(
+                    functional_tupelize_tag{}, std::forward<T>(args)...);
             }
         }    // end namespace spreading
     }        // end namespace detail
@@ -92,7 +163,8 @@ namespace util {
     template <typename... T>
     detail::spreading::spread_box<T...> spread_this(T&&... args)
     {
-        return detail::spreading::spread_box<T...>{std::forward<T>(args)...};
+        return detail::spreading::spread_box<T...>(
+            tuple<T...>{std::forward<T>(args)...});
     }
 
     namespace detail {
