@@ -199,10 +199,11 @@ namespace util {
     /// if possible. This can be used to create a mapper function used
     /// in map_pack that maps one element to an arbitrary count (1:n).
     template <typename... T>
-    detail::spreading::spread_box<T...> spread_this(T&&... args)
+    detail::spreading::spread_box<typename std::decay<T>::type...>
+    spread_this(T&&... args)
     {
-        return detail::spreading::spread_box<T...>(
-            tuple<T...>{std::forward<T>(args)...});
+        return detail::spreading::spread_box<typename std::decay<T>::type...>(
+            make_tuple(std::forward<T>(args)...));
     }
 
     namespace detail {
@@ -846,9 +847,11 @@ namespace util {
                 // We use tag dispatching here, to categorize the type T whether
                 // it satisfies the container or tuple like requirements.
                 // Then we can choose the underlying implementation accordingly.
-                return try_match(
+                auto res = try_match(
                     container_match_of<typename std::decay<T>::type>{},
                     std::forward<T>(element));
+
+                return std::move(res);
             }
 
         public:
