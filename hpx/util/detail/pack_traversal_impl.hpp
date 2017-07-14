@@ -631,6 +631,8 @@ namespace util {
                                  typename std::decay<T>::type>>(),
                     std::forward<T>(container)))
             {
+                // spreading::map_spread
+
                 return invoke_fused(
                     tuple_like_remapper<Strategy, typename std::decay<M>::type,
                         typename std::decay<T>::type>{std::forward<M>(mapper)},

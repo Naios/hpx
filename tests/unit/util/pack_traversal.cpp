@@ -772,8 +772,7 @@ static void testSpreadTraverse()
 {
     // 1:2 mappings (multiple arguments)
     {
-        tuple<int, int, int, int> res =
-            map_pack(duplicate_mapper{}, 1, 2);
+        tuple<int, int, int, int> res = map_pack(duplicate_mapper{}, 1, 2);
 
         auto expected = make_tuple(1, 1, 2, 2);
 
@@ -791,6 +790,23 @@ static void testSpreadTraverse()
 
 static void testSpreadContainerTraverse()
 {
+    // 1:2 mappings (multiple arguments)
+    {
+        std::vector<tuple<int, int>> res =
+            map_pack(duplicate_mapper{}, std::vector<int>{1});
+
+        std::vector<tuple<int, int>> expected;
+        expected.push_back(make_tuple(1, 1));
+
+        HPX_TEST((res == expected));
+    }
+
+    // 1:0 mappings
+    {
+        std::vector<hpx::util::tuple<>> res =
+            map_pack(zero_mapper{}, std::vector<int>{1});
+        HPX_TEST_EQ(res.size(), 1U);
+    }
 }
 
 static void testSpreadTupleLikeTraverse()
