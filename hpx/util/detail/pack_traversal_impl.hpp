@@ -542,14 +542,24 @@ namespace util {
 #endif
                 >
             {
+                struct materializer
+                {
+                    template <typename... Args>
+                    Base<Args...> operator()(Args&&... args) const
+                    {
+                        return {std::forward<Args>(args)...};
+                    }
+                };
+
                 M mapper_;
 
                 template <typename... Args>
                 auto operator()(Args&&... args)
-                    -> Base<typename invoke_result<M, OldArgs>::type...>
+                    -> decltype(spreading::map_spread(materializer{},
+                        std::declval<M>()(std::forward<Args>(args))...))
                 {
-                    return Base<typename invoke_result<M, OldArgs>::type...>{
-                        mapper_(std::forward<Args>(args))...};
+                    return spreading::map_spread(
+                        materializer{}, mapper_(std::forward<Args>(args))...);
                 }
             };
             template <typename M, template <typename...> class Base,
@@ -631,8 +641,6 @@ namespace util {
                                  typename std::decay<T>::type>>(),
                     std::forward<T>(container)))
             {
-                // spreading::map_spread
-
                 return invoke_fused(
                     tuple_like_remapper<Strategy, typename std::decay<M>::type,
                         typename std::decay<T>::type>{std::forward<M>(mapper)},
