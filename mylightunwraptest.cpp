@@ -32,7 +32,7 @@ static void testSpreadTraverse()
     using namespace hpx::util::detail::spreading;
 
     // 1:2 mappings (multiple arguments)
-    {
+    /*{
         tuple<int, int, int, int> res = map_pack(duplicate_mapper{}, 1, 2);
 
         tuple<int, int, int, int> expected = make_tuple(1, 1, 2, 2);
@@ -64,6 +64,17 @@ static void testSpreadTraverse()
         std::vector<hpx::util::tuple<>> res =
             map_pack(zero_mapper{}, std::vector<int>{1});
         assert(res.size() == 1U);
+    }*/
+
+    // 1:2 mappings (multiple arguments)
+    {
+        tuple<tuple<int, int, int, int>> res =
+            map_pack(duplicate_mapper{}, make_tuple(make_tuple(1, 2)));
+
+        tuple<tuple<int, int, int, int>> expected =
+            make_tuple(make_tuple(1, 1, 2, 2));
+
+        assert((res == expected));
     }
 }
 
@@ -74,13 +85,6 @@ int main(int, char**)
     using namespace hpx::util::detail::spreading;
 
     testSpreadTraverse();
-
-    /*hpx::util::tuple<int, int, int, int> res1 =
-        tupelize(0, 0, spread_this(0, 0));
-
-    hpx::util::tuple<int, int, int> res2 = tupelize(0, 0, 0);
-
-    map_pack([](int) -> float { return 0.f; }, 0, 0);*/
 
     return 0;
 }
