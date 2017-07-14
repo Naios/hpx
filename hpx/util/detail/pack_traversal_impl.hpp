@@ -132,7 +132,7 @@ namespace util {
             auto apply_spread_impl(std::false_type, C&& callable, T&&... args)
                 -> typename invoke_result<C, T...>::type
             {
-                return invoke(
+                return hpx::util::invoke(
                     std::forward<C>(callable), std::forward<T>(args)...);
             }
             template <typename... T>

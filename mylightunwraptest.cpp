@@ -76,6 +76,12 @@ static void testSpreadTraverse()
 
         assert((res == expected));
     }
+
+    // 1:0 mappings
+    {
+        tuple<hpx::util::tuple<>> res =
+            map_pack(zero_mapper{}, make_tuple(make_tuple(1, 2)));
+    }
 }
 
 int main(int, char**)

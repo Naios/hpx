@@ -811,6 +811,22 @@ static void testSpreadContainerTraverse()
 
 static void testSpreadTupleLikeTraverse()
 {
+    // 1:2 mappings (multiple arguments)
+    {
+        tuple<tuple<int, int, int, int>> res =
+            map_pack(duplicate_mapper{}, make_tuple(make_tuple(1, 2)));
+
+        tuple<tuple<int, int, int, int>> expected =
+            make_tuple(make_tuple(1, 1, 2, 2));
+
+        HPX_TEST((res == expected));
+    }
+
+    // 1:0 mappings
+    {
+        tuple<hpx::util::tuple<>> res =
+            map_pack(zero_mapper{}, make_tuple(make_tuple(1, 2)));
+    }
 }
 
 int main(int, char**)
