@@ -195,17 +195,6 @@ namespace util {
         }    // end namespace spreading
     }        // end namespace detail
 
-    /// Indicate that the result shall be spread across the parent container
-    /// if possible. This can be used to create a mapper function used
-    /// in map_pack that maps one element to an arbitrary count (1:n).
-    template <typename... T>
-    detail::spreading::spread_box<typename std::decay<T>::type...> spread_this(
-        T&&... args)
-    {
-        return detail::spreading::spread_box<typename std::decay<T>::type...>(
-            make_tuple(std::forward<T>(args)...));
-    }
-
     namespace detail {
         /// Just traverses the pack with the given callable object,
         /// no result is returned or preserved.
