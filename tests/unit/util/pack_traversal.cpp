@@ -827,6 +827,8 @@ static void testSpreadTupleLikeTraverse()
         tuple<hpx::util::tuple<>> res =
             map_pack(zero_mapper{}, make_tuple(make_tuple(1, 2)));
     }
+
+    // TODO Fix mapping for std::array like types
 }
 
 int main(int, char**)
