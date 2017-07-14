@@ -1,6 +1,7 @@
 
 #include <hpx/util/pack_traversal.hpp>
 #include <cassert>
+#include <vector>
 
 /// A mapper which duplicates the given element
 struct duplicate_mapper
@@ -45,6 +46,24 @@ static void testSpreadTraverse()
 
         /// We expect a void result if all elements were reoved by the mapping
         assert((std::is_void<Result>::value));
+    }
+
+    // 1:2 mappings (multiple arguments)
+    {
+        std::vector<tuple<int, int>> res =
+            map_pack(duplicate_mapper{}, std::vector<int>{1});
+
+        std::vector<tuple<int, int>> expected;
+        expected.push_back(make_tuple(1, 1));
+
+        assert((res == expected));
+    }
+
+    // 1:0 mappings
+    {
+        std::vector<hpx::util::tuple<>> res =
+            map_pack(zero_mapper{}, std::vector<int>{1});
+        assert(res.size() == 1U);
     }
 }
 
