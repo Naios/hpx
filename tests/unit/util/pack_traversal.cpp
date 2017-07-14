@@ -772,18 +772,16 @@ static void testSpreadTraverse()
 {
     // 1:2 mappings (multiple arguments)
     {
-        tuple<int, int, float, float> res =
-            map_pack(duplicate_mapper{}, 1, 1.f);
+        tuple<int, int, int, int> res =
+            map_pack(duplicate_mapper{}, 1, 2);
 
-        auto expected = make_tuple(1, 1, 1.f, 1.f);
+        auto expected = make_tuple(1, 1, 2, 2);
 
         HPX_TEST((res == expected));
     }
 
     // 1:0 mappings
     {
-        map_pack(zero_mapper{}, 1, 1.f);
-
         using Result = decltype(map_pack(zero_mapper{}, 1, 1.f));
 
         /// We expect a void result if all elements were reoved by the mapping
