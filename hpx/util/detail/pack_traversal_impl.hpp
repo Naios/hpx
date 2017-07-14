@@ -547,7 +547,7 @@ namespace util {
                     template <typename... Args>
                     Base<Args...> operator()(Args&&... args) const
                     {
-                        return {std::forward<Args>(args)...};
+                        return Base<Args...>{std::forward<Args>(args)...};
                     }
                 };
 
