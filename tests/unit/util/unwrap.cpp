@@ -81,9 +81,28 @@ static void testLegacyUnwrap()
     }
 
     {
-        future<int> f = hpx::make_ready_future(0);
+        future<void> f = hpx::make_ready_future();
+        hpx::util::tuple<> res = unwrap(f);
+        (void) res;
+    }
 
-        auto callable = unwrapping([] (auto&&...) {
+    {
+        future<void> f1 = hpx::make_ready_future();
+        future<void> f2 = hpx::make_ready_future();
+        future<void> f3 = hpx::make_ready_future();
+        hpx::util::tuple<> res = unwrap(f1, f2, f3);
+        (void) res;
+    }
+
+    // local_dataflow_executor_v1.cpp
+    // Func=hpx::util::detail::functional_unwrap_impl<hpx::util::detail::old_unwrap_config,void (__cdecl *)(void),1>,
+    // Futures=hpx::util::tuple<hpx::lcos::future<void>>
+    {
+        future<void> f = hpx::make_ready_future();
+
+        hpx::util::tuple<> res = unwrap(f);
+
+        auto callable = unwrapping([]() {
             // ...
         });
 
