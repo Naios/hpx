@@ -123,6 +123,7 @@ namespace util {
 
         /// Unwraps the futures contained in the given pack args
         /// until the depth Depth.
+        /// This is the main entry function for immediate unwraps.
         template <std::size_t Depth, typename... Args>
         auto unwrap_depth_impl(Args&&... args)
             -> decltype(map_pack(future_unwrap_until_depth<Depth>{},
@@ -136,7 +137,7 @@ namespace util {
         /// tag dispatching a function because it does semantical checks before
         /// matching the tag, which leads to false errors.
         template <bool IsFusedInvoke>
-        struct invoke_wrapped_impl
+        struct invoke_wrapped_invocation_select
         {
             /// Invoke the callable with the tuple argument through invoke_fused
             template <typename C, typename T>
@@ -150,7 +151,7 @@ namespace util {
             }
         };
         template <>
-        struct invoke_wrapped_impl<false /*IsFusedInvoke*/>
+        struct invoke_wrapped_invocation_select<false /*IsFusedInvoke*/>
         {
             /// Invoke the callable with the plain argument through invoke,
             /// also when the result is a tuple like type, when we received
@@ -164,17 +165,43 @@ namespace util {
             }
         };
 
-        /// map_pack may return a tuple or a plain type, choose the
-        /// corresponding invocation function accordingly.
-        template <typename C, typename T>
-        auto invoke_wrapped(C&& callable, T&& unwrapped) -> decltype(
-            invoke_wrapped_impl<
-                traits::is_tuple_like<typename std::decay<T>::type>::value>::
-                apply(std::forward<C>(callable), std::forward<T>(unwrapped)))
+        template <typename Result>
+        struct invoke_wrapped_decorate_select
         {
-            return invoke_wrapped_impl<
-                traits::is_tuple_like<typename std::decay<T>::type>::value>::
-                apply(std::forward<C>(callable), std::forward<T>(unwrapped));
+            template <std::size_t Depth, typename C, typename... Args>
+            static auto apply(C&& callable, Args&&... args)
+            /*-> decltype(invoke_wrapped_invocation_select<
+                    traits::is_tuple_like<typename std::decay<Result>::type>::
+                        value>::apply(std::forward<C>(callable),
+                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...)))*/
+            {
+                return invoke_wrapped_invocation_select<
+                    traits::is_tuple_like<typename std::decay<Result>::type>::
+                        value>::apply(std::forward<C>(callable),
+                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
+            }
+        };
+        template <>
+        struct invoke_wrapped_decorate_select<void>
+        {
+            template <std::size_t Depth, typename C, typename... Args>
+            static auto apply(C&& callable, Args&&... args)
+            // -> decltype(std::forward<C>(callable)())
+            {
+                unwrap_depth_impl<Depth>(std::forward<Args>(args)...);
+                return std::forward<C>(callable)();
+            }
+        };
+
+        /// map_pack may return a tuple, a plain type or void choose the
+        /// corresponding invocation function accordingly.
+        template <std::size_t Depth, typename C, typename... Args>
+        auto invoke_wrapped(C&& callable, Args&&... args)
+        {
+            /*using Result =
+                decltype(unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
+            return invoke_wrapped_decorate_select<Result>::template apply< Depth>(std::forward<C>(callable), std::forward<Args>(args)...);
+            */
         }
 
         /// Implements the callable object which is returned by n invocation
@@ -193,20 +220,20 @@ namespace util {
 
             template <typename... Args>
             auto operator()(Args&&... args)
-                -> decltype(invoke_wrapped(std::declval<T&>(),
-                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...)))
+                -> decltype(invoke_wrapped<Depth>(std::declval<T&>(),
+                    std::forward<Args>(args)...))
             {
-                return invoke_wrapped(wrapped_,
-                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
+                return invoke_wrapped<Depth>(
+                    wrapped_, std::forward<Args>(args)...);
             }
 
             template <typename... Args>
             auto operator()(Args&&... args) const
-                -> decltype(invoke_wrapped(std::declval<T const&>(),
-                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...)))
+                -> decltype(invoke_wrapped<Depth>(std::declval<T const&>(),
+                    std::forward<Args>(args)...))
             {
-                return invoke_wrapped(wrapped_,
-                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
+                return invoke_wrapped<Depth>(
+                    wrapped_, std::forward<Args>(args)...);
             }
         };
 

@@ -8,6 +8,8 @@
 #include <hpx/util/tuple.hpp>
 #include <hpx/util/unwrap.hpp>
 
+#include <type_traits>
+
 using namespace hpx::util;
 using namespace hpx::lcos;
 
@@ -81,16 +83,16 @@ static void testLegacyUnwrap()
 
     {
         future<void> f = hpx::make_ready_future();
-        hpx::util::tuple<> res = unwrap(f);
-        (void) res;
+        using Result = decltype(unwrap(f));
+        static_assert(std::is_void<Result>::value, "Failed...");
     }
 
     {
         future<void> f1 = hpx::make_ready_future();
         future<void> f2 = hpx::make_ready_future();
         future<void> f3 = hpx::make_ready_future();
-        hpx::util::tuple<> res = unwrap(f1, f2, f3);
-        (void) res;
+        using Result = decltype(unwrap(f1, f2, f3));
+        static_assert(std::is_void<Result>::value, "Failed...");
     }
 
     {
