@@ -169,15 +169,17 @@ namespace util {
         struct invoke_wrapped_decorate_select
         {
             template <typename C, typename... Args>
-            static auto apply(C&& callable, Args&&... args)
-                /*-> decltype(invoke_wrapped_invocation_select<
+            static auto apply(C&& callable, Args&&... args)/*
+            TODO FIXME:
+            -> decltype(
+                invoke_wrapped_invocation_select<(
                     traits::is_tuple_like<typename std::decay<Result>::type>::
-                        value>::apply(std::forward<C>(callable),
+                        value)>::apply(std::forward<C>(callable),
                     unwrap_depth_impl<Depth>(std::forward<Args>(args)...)))*/
             {
-                return invoke_wrapped_invocation_select<
+                return invoke_wrapped_invocation_select<(
                     traits::is_tuple_like<typename std::decay<Result>::type>::
-                        value>::apply(std::forward<C>(callable),
+                        value)>::apply(std::forward<C>(callable),
                     unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
             }
         };
@@ -186,7 +188,7 @@ namespace util {
         {
             template <typename C, typename... Args>
             static auto apply(C&& callable, Args&&... args)
-                // -> decltype(std::forward<C>(callable)())
+                -> decltype(std::forward<C>(callable)())
             {
                 unwrap_depth_impl<Depth>(std::forward<Args>(args)...);
                 return std::forward<C>(callable)();

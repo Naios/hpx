@@ -781,8 +781,8 @@ static void testSpreadTraverse()
 
     // 1:0 mappings
     {
-        tuple<> res = map_pack(zero_mapper{}, 0, 1, 2);
-        (void)res;
+        using Result = decltype(map_pack(zero_mapper{}, 0, 1, 2));
+        static_assert(std::is_void<Result>::value, "Failed...");
     }
 }
 
