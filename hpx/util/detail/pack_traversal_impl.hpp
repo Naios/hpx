@@ -171,6 +171,27 @@ namespace util {
                 return map_spread(
                     functional_tupelize_tag{}, std::forward<T>(args)...);
             }
+
+            /// Converts an empty tuple to void
+            template <typename First, typename... Rest>
+            tuple<First, Rest...> voidify_empty_tuple(tuple<First, Rest...> val)
+            {
+                return std::move(val);
+            }
+            inline void voidify_empty_tuple(tuple<>)
+            {
+            }
+
+            /// Converts the given variadic arguments into a tuple in a way
+            /// that spread return values are inserted into the current pack.
+            ///
+            /// If the returned tuple is empty, voidis returned instead.
+            template <typename... T>
+            auto tupelize_or_void(T&&... args) -> decltype(
+                voidify_empty_tuple(tupelize(std::forward<T>(args)...)))
+            {
+                return voidify_empty_tuple(tupelize(std::forward<T>(args)...));
+            }
         }    // end namespace spreading
     }        // end namespace detail
 
@@ -862,7 +883,7 @@ namespace util {
             template <typename First, typename Second, typename... T>
             auto init_traverse(strategy_remap_tag strategy, First&& first,
                 Second&& second, T&&... rest)
-                -> decltype(spreading::tupelize(
+                -> decltype(spreading::tupelize_or_void(
                     std::declval<mapping_helper>().try_traverse(
                         strategy, std::forward<First>(first)),
                     std::declval<mapping_helper>().try_traverse(
@@ -870,7 +891,7 @@ namespace util {
                     std::declval<mapping_helper>().try_traverse(
                         strategy, std::forward<T>(rest))...))
             {
-                return spreading::tupelize(
+                return spreading::tupelize_or_void(
                     try_traverse(strategy, std::forward<First>(first)),
                     try_traverse(strategy, std::forward<Second>(second)),
                     try_traverse(strategy, std::forward<T>(rest))...);
