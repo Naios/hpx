@@ -79,6 +79,16 @@ static void testLegacyUnwrap()
         std::vector<future<int>> f;
         std::vector<int> res = unwrap(f);
     }
+
+    {
+        future<int> f = hpx::make_ready_future(0);
+
+        auto callable = unwrapping([] (auto&&...) {
+            // ...
+        });
+
+        callable(f);
+    }
 }
 
 int main(int, char**)
