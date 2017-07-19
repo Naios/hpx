@@ -38,20 +38,17 @@ namespace util {
         ///       preserving the behaviour of the new implementations
         ///       configuration.
         ///
-        template <bool AllowsVoidFutures, bool UnwrapTopLevelTuples>
+        template <bool UnwrapTopLevelTuples>
         struct unwrap_config
         {
-            static HPX_CONSTEXPR_OR_CONST bool allows_void_futures =
-                AllowsVoidFutures;
-
             static HPX_CONSTEXPR_OR_CONST bool unwrap_top_level_tuples =
                 UnwrapTopLevelTuples;
         };
 
         /// The old unwrapped implementation
-        using old_unwrap_config = unwrap_config<true, true>;
+        using old_unwrap_config = unwrap_config<true>;
         /// The new unwrap implementation
-        using new_unwrap_config = unwrap_config<false, false>;
+        using new_unwrap_config = unwrap_config<false>;
 
         /// A tag which may replace void results when unwrapping
         struct unwrapped_void_tag
@@ -73,20 +70,6 @@ namespace util {
                 std::is_void<
                     typename traits::future_traits<T>::result_type>::value>;
 
-        /// Return an unknown type (unwrapped_void_tag) when unwrapping
-        /// futures instantiated with void to work around the issue that
-        /// we can't represent void otherwise in a variadic argument pack.
-        template <typename Config, typename T>
-        unwrapped_void_tag void_or_assert(T&& future)
-        {
-            static_assert(
-                Config::allows_void_futures && std::is_same<T, T>::value,
-                "Unwrapping future<void> or shared_future<void> is "
-                "forbidden! Use hpx::lcos::wait_all instead!");
-            std::forward<T>(future).get();
-            return {};
-        }
-
         /// A mapper that maps futures to its representing type
         ///
         /// The mapper does unwrap futures nested inside futures until
@@ -104,10 +87,10 @@ namespace util {
             template <typename T,
                 typename std::enable_if<is_void_future<
                     typename std::decay<T>::type>::value>::type* = nullptr>
-            auto operator()(T&& future) const
-                -> decltype(void_or_assert<Config>(std::forward<T>(future)))
+            auto operator()(T&& future) const -> decltype(spread_this())
             {
-                return void_or_assert<Config>(std::forward<T>(future));
+                std::forward<T>(future).get();
+                return spread_this();
             }
 
             template <typename T,
@@ -130,10 +113,10 @@ namespace util {
             template <typename T,
                 typename std::enable_if<is_void_future<
                     typename std::decay<T>::type>::value>::type* = nullptr>
-            auto operator()(T&& future) const
-                -> decltype(void_or_assert<Config>(std::forward<T>(future)))
+            auto operator()(T&& future) const -> decltype(spread_this())
             {
-                return void_or_assert<Config>(std::forward<T>(future));
+                std::forward<T>(future).get();
+                return spread_this();
             }
 
             template <typename T,
@@ -154,10 +137,10 @@ namespace util {
             template <typename T,
                 typename std::enable_if<is_void_future<
                     typename std::decay<T>::type>::value>::type* = nullptr>
-            auto operator()(T&& future) const
-                -> decltype(void_or_assert<Config>(std::forward<T>(future)))
+            auto operator()(T&& future) const -> decltype(spread_this())
             {
-                return void_or_assert<Config>(std::forward<T>(future));
+                std::forward<T>(future).get();
+                return spread_this();
             }
 
             template <typename T,
