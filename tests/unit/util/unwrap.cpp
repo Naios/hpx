@@ -46,10 +46,9 @@ static void testFunctionalFutureUnwrap()
         HPX_TEST_EQ((res), (3));
     }
 
-    /// Pass single tuples shrough which were passed to the functional unwrap
+    /// Unpack single tuples which were passed to the functional unwrap
     {
-        auto unwrapper =
-            unwrapping([](tuple<int, int> a) { return get<0>(a) + get<1>(a); });
+        auto unwrapper = unwrapping([](int a, int b) { return a + b; });
 
         int res = unwrapper(make_ready_future(make_tuple(1, 2)));
 

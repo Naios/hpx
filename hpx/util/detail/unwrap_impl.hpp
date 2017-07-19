@@ -48,7 +48,7 @@ namespace util {
         /// The old unwrapped implementation
         using old_unwrap_config = unwrap_config<true>;
         /// The new unwrap implementation
-        using new_unwrap_config = unwrap_config<false>;
+        using new_unwrap_config = unwrap_config<true>;
 
         /// A tag which may replace void results when unwrapping
         struct unwrapped_void_tag
