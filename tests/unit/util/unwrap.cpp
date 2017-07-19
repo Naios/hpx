@@ -115,6 +115,20 @@ static void testLegacyUnwrap()
 
         callable(f);
     }
+
+    // global_spmd_block.cpp
+    //    executor_traits.hpp:340:21: error: void function 'call' should not
+    //      return a value [-Wreturn-type]
+    //                    return hpx::util::unwrapped(results);
+    //                    ^      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    /// executor_traits.hpp:370:41: note: in instantiation of function
+    //      template specialization
+    //      'hpx::parallel::v3::detail::bulk_execute_helper::call<hpx::parallel::execution::parallel_executor &,
+    //      hpx::lcos::detail::spmd_block_helper<bulk_test_action>, boost::integer_range<unsigned long>, unsigned long
+    //      &>' requested here
+    //            return bulk_execute_helper::call(0, std::forward<Executor>(exec),
+    {
+    }
 }
 
 int main(int, char**)

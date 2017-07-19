@@ -125,11 +125,6 @@ namespace util {
     ///             The main reason for deprecation was that the automatic
     ///             callable type detection doesn't anymore correctly,
     ///             as soon as we allowed to route non future types through.
-    ///             In addition the capability to wait for futures which
-    ///             were instantiated with void was removed,
-    ///             use hpx::lcos::wait_all instead.
-    ///             Also top level tuple like types aren't unwrapped anymore
-    ///             when those are passed as a single argument for consistency.
     ///
     template <typename... Args>
     // This will be enabled once the old implementation is deprecated:
