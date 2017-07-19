@@ -12,7 +12,7 @@
 #include <hpx/traits/is_future.hpp>
 #include <hpx/traits/is_future_range.hpp>
 #include <hpx/traits/is_future_tuple.hpp>
-#include <hpx/util/detail/unwrap_impl.hpp>
+#include <hpx/util/unwrap.hpp>
 
 #include <cstddef>
 #include <type_traits>
@@ -57,12 +57,10 @@ namespace util {
         {
             /// The immediate unwrap
             template <typename... Args>
-            static auto proxy(Args&&... args) -> decltype(
-                detail::unwrap_depth_impl<Depth>(detail::old_unwrap_config{},
-                    std::forward<Args>(args)...))
+            static auto proxy(Args&&... args)
+                -> decltype(unwrap_n<Depth>(std::forward<Args>(args)...))
             {
-                return detail::unwrap_depth_impl<Depth>(
-                    detail::old_unwrap_config{}, std::forward<Args>(args)...);
+                return unwrap_n<Depth>(std::forward<Args>(args)...);
             }
         };
         template <std::size_t Depth>
@@ -70,14 +68,10 @@ namespace util {
         {
             /// The functional unwrap
             template <typename Callable>
-            static auto proxy(Callable&& callable)
-                -> decltype(detail::functional_unwrap_depth_impl<Depth>(
-                    detail::old_unwrap_config{},
-                    std::forward<Callable>(callable)))
+            static auto proxy(Callable&& callable) -> decltype(
+                unwrapping_n<Depth>(std::forward<Callable>(callable)))
             {
-                return detail::functional_unwrap_depth_impl<Depth>(
-                    detail::old_unwrap_config{},
-                    std::forward<Callable>(callable));
+                return unwrapping_n<Depth>(std::forward<Callable>(callable));
             }
         };
     }    // end namespace detail
