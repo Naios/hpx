@@ -591,10 +591,15 @@ namespace util {
 
                 template <typename... Args>
                 auto operator()(Args&&... args)
-                    -> Base<typename invoke_result<M, OldArg>::type, Size>
+                    -> Base<decltype(spreading::unpack(std::declval<
+                                typename invoke_result<M, OldArg>::type>())),
+                        Size>
                 {
-                    return Base<typename invoke_result<M, OldArg>::type, Size>{
-                        {mapper_(std::forward<Args>(args))...}};
+                    return Base<
+                        decltype(spreading::unpack(std::declval<
+                            typename invoke_result<M, OldArg>::type>())),
+                        Size>{{spreading::unpack(
+                        mapper_(std::forward<Args>(args)))...}};
                 }
             };
             template <typename M, template <typename, std::size_t> class Base,
