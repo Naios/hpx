@@ -166,7 +166,7 @@ namespace util {
 
         /// map_pack may return a tuple or a plain type, choose the
         /// corresponding invocation function accordingly.
-        template <bool HadMultipleArguments, typename C, typename T>
+        template <typename C, typename T>
         auto invoke_wrapped(C&& callable, T&& unwrapped) -> decltype(
             invoke_wrapped_impl<
                 traits::is_tuple_like<typename std::decay<T>::type>::value>::
@@ -192,11 +192,11 @@ namespace util {
             }
 
             template <typename... Args>
-            auto operator()(Args&&... args) -> decltype(
-                invoke_wrapped<(sizeof...(args) > 1)>(std::declval<T&>(),
+            auto operator()(Args&&... args)
+                -> decltype(invoke_wrapped(std::declval<T&>(),
                     unwrap_depth_impl<Depth>(std::forward<Args>(args)...)))
             {
-                return invoke_wrapped<(sizeof...(args) > 1)>(wrapped_,
+                return invoke_wrapped(wrapped_,
                     unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
             }
 
