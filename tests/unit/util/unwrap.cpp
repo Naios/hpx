@@ -94,13 +94,21 @@ static void testLegacyUnwrap()
         (void) res;
     }
 
+    {
+        future<void> f = hpx::make_ready_future();
+
+        auto callable = unwrapping([](int, int) {
+            // ...
+        });
+
+        callable(1, f, 2);
+    }
+
     // local_dataflow_executor_v1.cpp
     // Func=hpx::util::detail::functional_unwrap_impl<hpx::util::detail::old_unwrap_config,void (__cdecl *)(void),1>,
     // Futures=hpx::util::tuple<hpx::lcos::future<void>>
     {
         future<void> f = hpx::make_ready_future();
-
-        hpx::util::tuple<> res = unwrap(f);
 
         auto callable = unwrapping([]() {
             // ...
