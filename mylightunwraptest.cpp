@@ -82,6 +82,11 @@ static void testSpreadTraverse()
         tuple<hpx::util::tuple<>> res =
             map_pack(zero_mapper{}, make_tuple(make_tuple(1, 2)));
     }
+
+    // Regression
+    {
+        tuple<> res = map_pack(zero_mapper{}, 0, 1, 2);
+    }
 }
 
 int main(int, char**)

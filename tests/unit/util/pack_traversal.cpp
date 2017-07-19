@@ -781,10 +781,7 @@ static void testSpreadTraverse()
 
     // 1:0 mappings
     {
-        using Result = decltype(map_pack(zero_mapper{}, 1, 1.f));
-
-        /// We expect a void result if all elements were reoved by the mapping
-        HPX_TEST((std::is_void<Result>::value));
+        tuple<> res = map_pack(zero_mapper{}, 0, 1, 2);
     }
 }
 
@@ -826,6 +823,7 @@ static void testSpreadTupleLikeTraverse()
     {
         tuple<hpx::util::tuple<>> res =
             map_pack(zero_mapper{}, make_tuple(make_tuple(1, 2)));
+        (void) res;
     }
 
 #if defined(HPX_HAVE_CXX11_STD_ARRAY)
@@ -834,8 +832,8 @@ static void testSpreadTupleLikeTraverse()
         std::array<tuple<int, int>, 2> res =
             map_pack(duplicate_mapper{}, std::array<int, 2>{{1, 2}});
 
-        std::array<tuple<int, int>, 2> expected = {
-            make_tuple(1, 1), make_tuple(2, 2)};
+        std::array<tuple<int, int>, 2> expected{
+            {make_tuple(1, 1), make_tuple(2, 2)}};
 
         HPX_TEST((res == expected));
     }
@@ -844,6 +842,7 @@ static void testSpreadTupleLikeTraverse()
     {
         std::array<tuple<>, 2> res =
             map_pack(zero_mapper{}, std::array<int, 2>{{1, 2}});
+        (void) res;
     }
 #endif
 }
