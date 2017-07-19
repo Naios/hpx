@@ -74,6 +74,19 @@ namespace util {
             template <typename T>
             using unpacked_of_t = decltype(unpack(std::declval<T>()));
 
+            /// Converts types to the type and spread_box objects to its
+            /// underlying tuple. If the type is mapped to zero elements,
+            /// the return type will be void.
+            template <typename T>
+            auto unpack_or_void(T&& type)
+                -> decltype(unpack(std::forward<T>(type)))
+            {
+                return unpack(std::forward<T>(type));
+            }
+            inline void unpack_or_void(spread_box<>)
+            {
+            }
+
             /// Converts types to the a tuple carrying the single type and
             /// spread_box objects to its underlying tuple.
             template <typename T>
@@ -830,11 +843,12 @@ namespace util {
 
             /// \copybrief try_traverse
             template <typename T>
-            auto init_traverse(strategy_remap_tag, T&& element) -> decltype(
-                spreading::unpack(std::declval<mapping_helper>().try_traverse(
-                    strategy_remap_tag{}, std::declval<T>())))
+            auto init_traverse(strategy_remap_tag, T&& element)
+                -> decltype(spreading::unpack_or_void(
+                    std::declval<mapping_helper>().try_traverse(
+                        strategy_remap_tag{}, std::declval<T>())))
             {
-                return spreading::unpack(try_traverse(
+                return spreading::unpack_or_void(try_traverse(
                     strategy_remap_tag{}, std::forward<T>(element)));
             }
             template <typename T>
