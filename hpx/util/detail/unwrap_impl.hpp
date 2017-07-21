@@ -165,21 +165,33 @@ namespace util {
             }
         };
 
+        /// Invokes the callable object with the result:
+        /// - If the result is a tuple-like type `invoke_fused` is used
+        /// - Otherwise `invoke` is used
+        template <typename C, typename T>
+        auto dispatch_wrapped_invocation_select(C&& callable, T&& unwrapped)
+            -> decltype(invoke_wrapped_invocation_select<
+                (traits::is_tuple_like<typename std::decay<T>::type>::value)>::
+                    apply(std::forward<C>(callable),
+                        std::forward<T>(unwrapped)))
+        {
+            return invoke_wrapped_invocation_select<(
+                traits::is_tuple_like<typename std::decay<T>::type>::value)>::
+                apply(std::forward<C>(callable), std::forward<T>(unwrapped));
+        }
+
+        /// Helper for routing non void result types to the corresponding
+        /// callable object.
         template <std::size_t Depth, typename Result>
         struct invoke_wrapped_decorate_select
         {
             template <typename C, typename... Args>
-            static auto apply(C&& callable, Args&&... args)/*
-            TODO FIXME:
-            -> decltype(
-                invoke_wrapped_invocation_select<(
-                    traits::is_tuple_like<typename std::decay<Result>::type>::
-                        value)>::apply(std::forward<C>(callable),
-                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...)))*/
+            static auto apply(C&& callable, Args&&... args) -> decltype(
+                dispatch_wrapped_invocation_select(std::forward<C>(callable),
+                    unwrap_depth_impl<Depth>(std::forward<Args>(args)...)))
             {
-                return invoke_wrapped_invocation_select<(
-                    traits::is_tuple_like<typename std::decay<Result>::type>::
-                        value)>::apply(std::forward<C>(callable),
+                return dispatch_wrapped_invocation_select(
+                    std::forward<C>(callable),
                     unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
             }
         };
