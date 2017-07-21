@@ -193,9 +193,7 @@ namespace util {
                 return voidify_empty_tuple(tupelize(std::forward<T>(args)...));
             }
         }    // end namespace spreading
-    }        // end namespace detail
 
-    namespace detail {
         /// Just traverses the pack with the given callable object,
         /// no result is returned or preserved.
         struct strategy_traverse_tag

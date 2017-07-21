@@ -113,9 +113,10 @@ static void testLegacyUnwrap()
 
         auto callable = unwrapping([]() {
             // ...
+            return true;
         });
 
-        callable(f);
+        HPX_TEST((callable(f)));
     }
 
     // global_spmd_block.cpp
@@ -129,6 +130,27 @@ static void testLegacyUnwrap()
     //      hpx::lcos::detail::spmd_block_helper<bulk_test_action>, boost::integer_range<unsigned long>, unsigned long
     //      &>' requested here
     //            return bulk_execute_helper::call(0, std::forward<Executor>(exec),
+    {
+        std::vector<hpx::lcos::future<void>> vec;
+        (void) vec;
+        using Result = decltype(unwrap(vec));
+        static_assert(std::is_void<Result>::value, "Failed...");
+    }
+
+    /*1>local_dataflow_std_array.cpp
+    1>e:\projekte\hpx\hpx\lcos\dataflow.hpp(129): error C2039: "type": Ist kein Element von "hpx::lcos::detail::dataflow_return<Func,Futures,void>"
+    1>        with
+    1>        [
+    1>            Func=hpx::util::detail::functional_unwrap_impl<int (__cdecl *)(const std::array<int,10> &),1>,
+    1>            Futures=hpx::util::tuple<std::array<hpx::lcos::future<int>,10>>
+    1>        ]
+    1>e:\projekte\hpx\hpx\lcos\dataflow.hpp(129): note: Siehe Deklaration von "hpx::lcos::detail::dataflow_return<Func,Futures,void>"
+    1>        with
+    1>        [
+    1>            Func=hpx::util::detail::functional_unwrap_impl<int (__cdecl *)(const std::array<int,10> &),1>,
+    1>            Futures=hpx::util::tuple<std::array<hpx::lcos::future<int>,10>>
+    1>        ]
+    1>e:\projekte\hpx\hpx\lcos\local\dataflow.hpp(239): note: Siehe Verweis auf die Klasse Vorlage-Instanziierung "hpx::lcos::detail::dataflow_frame<hpx::launch,hpx::util::detail::functional_unwrap_impl<int (__cdecl *)(const std::array<int,10> &),1>,hpx::util::tuple<Range>>", die kompiliert wird.*/
     {
     }
 }
