@@ -1,4 +1,4 @@
-//  Copyright (c) 2017 Denis Blank
+﻿//  Copyright (c) 2017 Denis Blank
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -130,11 +130,27 @@ static void testLegacyUnwrap()
     //      hpx::lcos::detail::spmd_block_helper<bulk_test_action>, boost::integer_range<unsigned long>, unsigned long
     //      &>' requested here
     //            return bulk_execute_helper::call(0, std::forward<Executor>(exec),
+
+    // ... and ...
+
+    //1>sequential_executor_v1.cpp
+    //1>e:\projekte\hpx\hpx\parallel\executors\sequenced_executor.hpp(127): error C2562: "hpx::parallel::execution::sequenced_executor::bulk_sync_execute": "void"-Funktion gibt einen Wert zurück
+    //1>e:\projekte\hpx\hpx\parallel\executors\sequenced_executor.hpp(123): note: Siehe Deklaration von "hpx::parallel::execution::sequenced_executor::bulk_sync_execute"
+    //1>e:\projekte\hpx\hpx\parallel\executors\sequenced_executor.hpp(210): note: Siehe Verweis auf die Instanziierung der gerade kompilierten Funktions-Vorlage "hpx::parallel::execution::detail::bulk_execute_result_impl<F,Shape,true,_Ty>::type hpx::parallel::execution::sequenced_executor::bulk_sync_execute<hpx::util::detail::bound<void (__cdecl *(const hpx::util::detail::placeholder<1> &,hpx::thread::id &,const hpx::util::detail::placeholder<2> &))(int,hpx::thread::id,int)>,S,_Ty>(F &&,const S &,_Ty &&)".
+    //1>        with
+    //1>        [
+    //1>            F=hpx::util::detail::bound<void (__cdecl *(const hpx::util::detail::placeholder<1> &,hpx::thread::id &,const hpx::util::detail::placeholder<2> &))(int,hpx::thread::id,int)>,
+    //1>            Shape=std::vector<int,std::allocator<int>>,
+    //1>            _Ty=int,
+    //1>            S=std::vector<int,std::allocator<int>>
+    //1>        ]
     {
+        /*
+        TODO: Fix this
         std::vector<hpx::lcos::future<void>> vec;
         (void) vec;
         using Result = decltype(unwrap(vec));
-        static_assert(std::is_void<Result>::value, "Failed...");
+        static_assert(std::is_void<Result>::value, "Failed...");*/
     }
 
     /*1>local_dataflow_std_array.cpp
@@ -151,7 +167,43 @@ static void testLegacyUnwrap()
     1>            Futures=hpx::util::tuple<std::array<hpx::lcos::future<int>,10>>
     1>        ]
     1>e:\projekte\hpx\hpx\lcos\local\dataflow.hpp(239): note: Siehe Verweis auf die Klasse Vorlage-Instanziierung "hpx::lcos::detail::dataflow_frame<hpx::launch,hpx::util::detail::functional_unwrap_impl<int (__cdecl *)(const std::array<int,10> &),1>,hpx::util::tuple<Range>>", die kompiliert wird.*/
+    //
+    // Func=hpx::util::detail::functional_unwrap_impl<int (__cdecl *)(const std::array<int,10> &),1>,
+    // Futures=hpx::util::tuple<std::array<hpx::lcos::future<int>,10>>
     {
+        auto unwrapper = unwrapping([](std::array<int, 2> const& ar) {
+            // ...
+            return true;
+        });
+
+        hpx::util::tuple<std::array<hpx::lcos::future<int>, 2>> in =
+            hpx::util::make_tuple(std::array<hpx::lcos::future<int>, 2>{
+                {hpx::lcos::make_ready_future(1),
+                    hpx::lcos::make_ready_future(2)}});
+
+        HPX_TEST((unwrapper(in)));
+    }
+
+    {
+        std::array<hpx::lcos::future<int>, 2> in{
+            {hpx::lcos::make_ready_future(1), hpx::lcos::make_ready_future(2)}};
+
+        std::array<int, 2> result = unwrap(in);
+
+        HPX_TEST((result == std::array<int, 2>{{1, 2}}));
+    }
+
+    {
+        auto unwrapper = unwrapping([](std::array<int, 2> const& ar) {
+            // ...
+            return true;
+        });
+
+        std::array<hpx::lcos::future<int>, 2> in{
+            {hpx::lcos::make_ready_future(1), hpx::lcos::make_ready_future(2)}};
+
+        auto result = unwrapper(in);
+        HPX_TEST((result));
     }
 }
 
