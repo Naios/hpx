@@ -194,7 +194,7 @@ static void testLegacyUnwrap()
     }
 
     {
-        auto unwrapper = unwrapping([](std::array<int, 2> const& ar) {
+        auto unwrapper = unwrapping([](auto&&... ar) {
             // ...
             return true;
         });
