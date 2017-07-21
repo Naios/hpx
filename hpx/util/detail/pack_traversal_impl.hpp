@@ -90,10 +90,9 @@ namespace util {
             /// Converts types to the a tuple carrying the single type and
             /// spread_box objects to its underlying tuple.
             template <typename T>
-            auto undecorate(T&& type)
-                -> decltype(make_tuple(std::forward<T>(type)))
+            tuple<T> undecorate(T&& type)
             {
-                return make_tuple(std::forward<T>(type));
+                return {std::forward<T>(type)};
             }
             template <typename... T>
             auto undecorate(spread_box<T...> type) -> decltype(type.unbox())
