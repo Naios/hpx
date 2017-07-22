@@ -45,6 +45,22 @@ namespace util {
                     return std::move(boxed_);
                 }
             };
+            template <>
+            class spread_box<>
+            {
+            public:
+                explicit spread_box()
+                {
+                }
+                explicit spread_box(tuple<>)
+                {
+                }
+
+                tuple<> unbox()
+                {
+                    return {};
+                }
+            };
 
             /// Deduces to a true_type if the fiven type is a flat tuple
             template <typename T>
@@ -100,10 +116,38 @@ namespace util {
                 return type.unbox();
             }
 
-            /// A tag for mapping the arguments to a tuple
-            struct functional_tupelize_tag
+            /// A callable object which maps its content back to a
+            /// tuple like type.
+            template <typename EmptyType, template <typename...> class Type>
+            struct tupelizer_base
             {
+                // We overload with one argument here so Clang and GCC don't
+                // have any issues with overloading against zero arguments.
+                template <typename First, typename... T>
+                Type<First, T...> operator()(First&& first, T&&... args) const
+                {
+                    return Type<First, T...>{
+                        std::forward<First>(first), std::forward<T>(args)...};
+                }
+
+                // Specifically return the empty object which can be different
+                // from a tuple.
+                EmptyType operator()() const
+                {
+                    return {};
+                }
             };
+
+            /// A callable object which maps its content back to a tuple.
+            template <template <typename...> class Type = tuple>
+            using tupelizer_of_t = tupelizer_base<tuple<>, Type>;
+
+            /// A callable object which maps its content back to a tuple like
+            /// type if it wasn't empty. For empty types arguments an empty
+            /// spread box is returned instead. This is useful to propagate
+            /// empty mappings back to the caller.
+            template <template <typename...> class Type = tuple>
+            using flat_tupelizer_of_t = tupelizer_base<spread_box<>, Type>;
 
             /// Use the recursive instantiation for a variadic pack which
             /// may contain spread types
@@ -115,15 +159,6 @@ namespace util {
                 return invoke_fused(std::forward<C>(callable),
                     tuple_cat(undecorate(std::forward<T>(args))...));
             }
-            template <typename... T>
-            auto apply_spread_impl(
-                std::true_type, functional_tupelize_tag, T&&... args)
-                -> decltype(tuple_cat(undecorate(std::forward<T>(args))...))
-            {
-                // Optimized version to prevent useless tuple
-                // unpacking and re-assembling
-                return tuple_cat(undecorate(std::forward<T>(args))...);
-            }
 
             /// Use the linear instantiation for variadic packs which don't
             /// contain spread types.
@@ -133,15 +168,6 @@ namespace util {
             {
                 return hpx::util::invoke(
                     std::forward<C>(callable), std::forward<T>(args)...);
-            }
-            template <typename... T>
-            tuple<T...> apply_spread_impl(
-                std::false_type, functional_tupelize_tag, T&&... args)
-
-            {
-                // Optimized version to prevent useless tuple
-                // unpacking and re-assembling
-                return tuple<T...>{std::forward<T>(args)...};
             }
 
             /// Deduces to a true_type if any of the given types marks
@@ -165,10 +191,21 @@ namespace util {
             /// that spread return values are inserted into the current pack.
             template <typename... T>
             auto tupelize(T&&... args) -> decltype(
-                map_spread(functional_tupelize_tag{}, std::forward<T>(args)...))
+                map_spread(tupelizer_of_t<>{}, std::forward<T>(args)...))
+            {
+                return map_spread(tupelizer_of_t<>{}, std::forward<T>(args)...);
+            }
+
+            /// Converts the given variadic arguments into a tuple in a way
+            /// that spread return values are inserted into the current pack.
+            /// If the arguments were mapped to zero arguments, the empty
+            /// mapping is propagated backwards to the caller.
+            template <template <typename...> class Type, typename... T>
+            auto flat_tupelize_to(T&&... args) -> decltype(map_spread(
+                flat_tupelizer_of_t<Type>{}, std::forward<T>(args)...))
             {
                 return map_spread(
-                    functional_tupelize_tag{}, std::forward<T>(args)...);
+                    flat_tupelizer_of_t<Type>{}, std::forward<T>(args)...);
             }
 
             /// Converts an empty tuple to void
@@ -528,24 +565,15 @@ namespace util {
 #endif
                 >
             {
-                struct materializer
-                {
-                    template <typename... Args>
-                    Base<Args...> operator()(Args&&... args) const
-                    {
-                        return Base<Args...>{std::forward<Args>(args)...};
-                    }
-                };
-
                 M mapper_;
 
                 template <typename... Args>
                 auto operator()(Args&&... args)
-                    -> decltype(spreading::map_spread(materializer{},
+                    -> decltype(spreading::flat_tupelize_to<Base>(
                         std::declval<M>()(std::forward<Args>(args))...))
                 {
-                    return spreading::map_spread(
-                        materializer{}, mapper_(std::forward<Args>(args))...);
+                    return spreading::flat_tupelize_to<Base>(
+                        mapper_(std::forward<Args>(args))...);
                 }
             };
             template <typename M, template <typename...> class Base,
