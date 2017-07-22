@@ -119,7 +119,7 @@ namespace util {
             template <typename T>
             tuple<T> undecorate(T&& type)
             {
-                return {std::forward<T>(type)};
+                return tuple<T>{std::forward<T>(type)};
             }
             template <typename... T>
             auto undecorate(spread_box<T...> type) -> decltype(type.unbox())
@@ -159,6 +159,35 @@ namespace util {
             /// empty mappings back to the caller.
             template <template <typename...> class Type = tuple>
             using flat_tupelizer_of_t = tupelizer_base<spread_box<>, Type>;
+
+            /// A callable object which maps its content back to an
+            /// array like type.
+            /// This transform can only be used for (flat) mappings which
+            /// return an empty mapping back to the caller.
+            template <template <typename, std::size_t> class Type>
+            struct flat_arraylizer
+            {
+                /// Deduces to the array type when the array is instantiated
+                /// with the given arguments.
+                template <typename First, typename... Rest>
+                using array_type_of_t =
+                    Type<typename std::decay<First>::type, 1 + sizeof...(Rest)>;
+
+                // We overload with one argument here so Clang and GCC don't
+                // have any issues with overloading against zero arguments.
+                template <typename First, typename... T>
+                auto operator()(First&& first, T&&... args) const
+                    -> array_type_of_t<First, T...>
+                {
+                    return array_type_of_t<First, T...>{
+                        {std::forward<First>(first), std::forward<T>(args)...}};
+                }
+
+                spread_box<> operator()() const
+                {
+                    return spread_box<>{};
+                }
+            };
 
             /// Use the recursive instantiation for a variadic pack which
             /// may contain spread types
@@ -217,6 +246,20 @@ namespace util {
             {
                 return map_spread(
                     flat_tupelizer_of_t<Type>{}, std::forward<T>(args)...);
+            }
+
+            /// Converts the given variadic arguments into an array in a way
+            /// that spread return values are inserted into the current pack.
+            /// Through this the size of the array like type might change.
+            /// If the arguments were mapped to zero arguments, the empty
+            /// mapping is propagated backwards to the caller.
+            template <template <typename, std::size_t> class Type,
+                typename... T>
+            auto flat_arraylize_to(T&&... args) -> decltype(
+                map_spread(flat_arraylizer<Type>{}, std::forward<T>(args)...))
+            {
+                return map_spread(
+                    flat_arraylizer<Type>{}, std::forward<T>(args)...);
             }
 
             /// Converts an empty tuple to void
@@ -623,19 +666,14 @@ namespace util {
 #endif
                 >
             {
-                /// Deduces to the array type when the array is instantiated
-                /// with the given arguments.
-                template <typename First, typename... Rest>
-                using array_type_of_t = Base<First, 1 + sizeof...(Rest)>;
-
                 M mapper_;
 
                 template <typename... Args>
                 auto operator()(Args&&... args)
-                    -> decltype(spreading::flat_tupelize_to<array_type_of_t>(
+                    -> decltype(spreading::flat_arraylize_to<Base>(
                         mapper_(std::forward<Args>(args))...))
                 {
-                    return spreading::flat_tupelize_to<array_type_of_t>(
+                    return spreading::flat_arraylize_to<Base>(
                         mapper_(std::forward<Args>(args))...);
                 }
             };
