@@ -143,12 +143,10 @@ static void testLegacyUnwrap()
     //1>            S=std::vector<int,std::allocator<int>>
     //1>        ]
     {
-        /*
-        TODO: Fix this
         std::vector<hpx::lcos::future<void>> vec;
         (void) vec;
         using Result = decltype(unwrap(vec));
-        static_assert(std::is_void<Result>::value, "Failed...");*/
+        static_assert(std::is_void<Result>::value, "Failed...");
     }
 
     // Func=hpx::util::detail::functional_unwrap_impl<int (__cdecl *)(const std::array<int,10> &),1>,
