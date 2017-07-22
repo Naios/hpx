@@ -58,7 +58,7 @@ namespace util {
 
                 tuple<> unbox()
                 {
-                    return {};
+                    return tuple<>{};
                 }
             };
 
@@ -498,6 +498,20 @@ namespace util {
                 spreading::unpacked_of_t<typename invoke_result<Mapping,
                     element_of_t<Container>>::type>>;
 
+            /// We are allowed to reuse the container if we map to the same
+            /// type we are accepting and when we have
+            /// the full ownership of the container.
+            template <typename T, typename M>
+            using can_reuse = std::integral_constant<bool,
+                std::is_same<element_of_t<T>,
+                    mapped_type_from_t<T, M>>::value &&
+                    std::is_rvalue_reference<T&&>::value>;
+
+            template <bool IsEmptyMapped, bool CanReuse>
+            struct container_category_tag
+            {
+            };
+
             /// We create a new container, which may hold the resulting type
             template <typename M, typename T>
             auto remap_container(std::false_type, M&& mapper, T&& container)
@@ -547,15 +561,6 @@ namespace util {
                 }
                 return std::forward<T>(container);
             }
-
-            /// We are allowed to reuse the container if we map to the same
-            /// type we are accepting and when we have
-            /// the full ownership of the container.
-            template <typename T, typename M>
-            using can_reuse = std::integral_constant<bool,
-                std::is_same<element_of_t<T>,
-                    mapped_type_from_t<T, M>>::value &&
-                    std::is_rvalue_reference<T&&>::value>;
 
             /// Remaps the content of the given container with type T,
             /// to a container of the same type which may contain
