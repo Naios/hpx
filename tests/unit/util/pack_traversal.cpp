@@ -822,28 +822,27 @@ static void testSpreadTupleLikeTraverse()
 
     // 1:0 mappings
     {
-        tuple<hpx::util::tuple<>> res =
-            map_pack(zero_mapper{}, make_tuple(make_tuple(1, 2)));
-        (void) res;
+        using Result = decltype(
+            map_pack(zero_mapper{}, make_tuple(make_tuple(1, 2), 1), 1));
+        static_assert(std::is_void<Result>::value, "Failed...");
     }
 
 #if defined(HPX_HAVE_CXX11_STD_ARRAY)
     // 1:2 mappings (multiple arguments)
     {
-        std::array<tuple<int, int>, 2> res =
+        std::array<int, 4> res =
             map_pack(duplicate_mapper{}, std::array<int, 2>{{1, 2}});
 
-        std::array<tuple<int, int>, 2> expected{
-            {make_tuple(1, 1), make_tuple(2, 2)}};
+        std::array<int, 4> expected{{1, 1, 2, 2}};
 
         HPX_TEST((res == expected));
     }
 
     // 1:0 mappings
     {
-        std::array<tuple<>, 2> res =
-            map_pack(zero_mapper{}, std::array<int, 2>{{1, 2}});
-        (void) res;
+        using Result =
+            decltype(map_pack(zero_mapper{}, std::array<int, 2>{{1, 2}}));
+        static_assert(std::is_void<Result>::value, "Failed...");
     }
 #endif
 }

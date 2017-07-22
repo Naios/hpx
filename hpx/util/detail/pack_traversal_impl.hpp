@@ -62,13 +62,24 @@ namespace util {
                 }
             };
 
-            /// Deduces to a true_type if the fiven type is a flat tuple
+            /// Deduces to a true_type if the given type is a spread marker
             template <typename T>
             struct is_spread : std::false_type
             {
             };
             template <typename... T>
             struct is_spread<spread_box<T...>> : std::true_type
+            {
+            };
+
+            /// Deduces to a true_type if the given type is an empty
+            /// spread marker
+            template <typename T>
+            struct is_empty_spread : std::false_type
+            {
+            };
+            template <>
+            struct is_empty_spread<spread_box<>> : std::true_type
             {
             };
 
@@ -134,7 +145,7 @@ namespace util {
                 // from a tuple.
                 EmptyType operator()() const
                 {
-                    return {};
+                    return EmptyType{};
                 }
             };
 
@@ -154,10 +165,10 @@ namespace util {
             template <typename C, typename... T>
             auto apply_spread_impl(std::true_type, C&& callable, T&&... args)
                 -> decltype(invoke_fused(std::forward<C>(callable),
-                    tuple_cat(undecorate(std::forward<T>(args))...)))
+                    util::tuple_cat(undecorate(std::forward<T>(args))...)))
             {
                 return invoke_fused(std::forward<C>(callable),
-                    tuple_cat(undecorate(std::forward<T>(args))...));
+                    util::tuple_cat(undecorate(std::forward<T>(args))...));
             }
 
             /// Use the linear instantiation for variadic packs which don't
@@ -612,19 +623,20 @@ namespace util {
 #endif
                 >
             {
+                /// Deduces to the array type when the array is instantiated
+                /// with the given arguments.
+                template <typename First, typename... Rest>
+                using array_type_of_t = Base<First, 1 + sizeof...(Rest)>;
+
                 M mapper_;
 
                 template <typename... Args>
                 auto operator()(Args&&... args)
-                    -> Base<decltype(spreading::unpack(std::declval<
-                                typename invoke_result<M, OldArg>::type>())),
-                        Size>
+                    -> decltype(spreading::flat_tupelize_to<array_type_of_t>(
+                        mapper_(std::forward<Args>(args))...))
                 {
-                    return Base<
-                        decltype(spreading::unpack(std::declval<
-                            typename invoke_result<M, OldArg>::type>())),
-                        Size>{{spreading::unpack(
-                        mapper_(std::forward<Args>(args)))...}};
+                    return spreading::flat_tupelize_to<array_type_of_t>(
+                        mapper_(std::forward<Args>(args))...);
                 }
             };
             template <typename M, template <typename, std::size_t> class Base,
