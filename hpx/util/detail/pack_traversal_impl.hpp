@@ -62,6 +62,13 @@ namespace util {
                 }
             };
 
+            /// Returns an empty spread box which represents an empty
+            /// mapped object.
+            inline spread_box<> empty_spread()
+            {
+                return spread_box<>{};
+            }
+
             /// Deduces to a true_type if the given type is a spread marker
             template <typename T>
             struct is_spread : std::false_type
@@ -183,9 +190,9 @@ namespace util {
                         {std::forward<First>(first), std::forward<T>(args)...}};
                 }
 
-                spread_box<> operator()() const
+                auto operator()() const -> decltype(empty_spread())
                 {
-                    return spread_box<>{};
+                    return empty_spread();
                 }
             };
 
@@ -498,6 +505,12 @@ namespace util {
                 spreading::unpacked_of_t<typename invoke_result<Mapping,
                     element_of_t<Container>>::type>>;
 
+            /// Deduces to a true_type if the mapping maps to zero elements.
+            template <typename T, typename M>
+            using is_empty_mapped =
+                spreading::is_empty_spread<typename std::decay<
+                    typename invoke_result<M, element_of_t<T>>::type>::type>;
+
             /// We are allowed to reuse the container if we map to the same
             /// type we are accepting and when we have
             /// the full ownership of the container.
@@ -507,14 +520,27 @@ namespace util {
                     mapped_type_from_t<T, M>>::value &&
                     std::is_rvalue_reference<T&&>::value>;
 
+            /// Categorizes a mapping of a homogeneous container
+            ///
+            /// \tparam IsEmptyMapped Identifies whether the mapping maps to
+            ///         to zero arguments.
+            /// \tparam CanReuse Identifies whether the container can be
+            ///         re-used through the mapping.
             template <bool IsEmptyMapped, bool CanReuse>
             struct container_category_tag
             {
             };
 
+            /// Categorizes the given container through a container_category_tag
+            template <typename T, typename M>
+            using container_category_of_t =
+                container_category_tag<is_empty_mapped<T, M>::value,
+                    can_reuse<T, M>::value>;
+
             /// We create a new container, which may hold the resulting type
             template <typename M, typename T>
-            auto remap_container(std::false_type, M&& mapper, T&& container)
+            auto remap_container(
+                container_category_tag<false, false>, M&& mapper, T&& container)
                 -> decltype(
                     rebind_container<mapped_type_from_t<T, M>>(container))
             {
@@ -550,8 +576,8 @@ namespace util {
             /// The remapper optimized for the case that we map to the same
             /// type we accepted such as int -> int.
             template <typename M, typename T>
-            auto remap_container(std::true_type, M&& mapper, T&& container) ->
-                typename std::decay<T>::type
+            auto remap_container(container_category_tag<false, true>,
+                M&& mapper, T&& container) -> typename std::decay<T>::type
             {
                 for (auto&& val :
                     container_accessor_of(std::forward<T>(container)))
@@ -560,6 +586,23 @@ namespace util {
                         std::forward<decltype(val)>(val)));
                 }
                 return std::forward<T>(container);
+            }
+
+            /// Remap the container to zero arguments
+            template <typename M, typename T>
+            auto remap_container(
+                container_category_tag<true, false>, M&& mapper, T&& container)
+                -> decltype(spreading::empty_spread())
+            {
+                for (auto&& val :
+                    container_accessor_of(std::forward<T>(container)))
+                {
+                    // Don't save the empty mapping for each invocation
+                    // of the mapper.
+                    std::forward<M>(mapper)(std::forward<decltype(val)>(val));
+                }
+                // Return one instance of an empty mapping for the container
+                return spreading::empty_spread();
             }
 
             /// Remaps the content of the given container with type T,
@@ -574,10 +617,10 @@ namespace util {
 #endif
                 >
             auto remap(strategy_remap_tag, T&& container, M&& mapper)
-                -> decltype(remap_container(can_reuse<T, M>{},
+                -> decltype(remap_container(container_category_of_t<T, M>{},
                     std::forward<M>(mapper), std::forward<T>(container)))
             {
-                return remap_container(can_reuse<T, M>{},
+                return remap_container(container_category_of_t<T, M>{},
                     std::forward<M>(mapper), std::forward<T>(container));
             }
 

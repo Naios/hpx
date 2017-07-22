@@ -801,9 +801,8 @@ static void testSpreadContainerTraverse()
 
     // 1:0 mappings
     {
-        std::vector<hpx::util::tuple<>> res =
-            map_pack(zero_mapper{}, std::vector<int>{1});
-        HPX_TEST_EQ(res.size(), 1U);
+        using Result = decltype(map_pack(zero_mapper{}, std::vector<int>{1}));
+        static_assert(std::is_void<Result>::value, "Failed...");
     }
 }
 
