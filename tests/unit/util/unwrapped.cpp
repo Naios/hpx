@@ -6,6 +6,9 @@
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <hpx/config.hpp>
+
+#if defined(HPX_HAVE_UNWRAPPED_COMPATIBILITY)
 #define HPX_NO_DEPRECATE_UNWRAPPED
 
 #include <hpx/hpx_init.hpp>
@@ -293,3 +296,11 @@ int main(
     return report_errors();
 }
 
+#else     // HPX_HAVE_UNWRAPPED_COMPATIBILITY
+
+int main(int, char**)
+{
+    return 0;
+}
+
+#endif    // HPX_HAVE_UNWRAPPED_COMPATIBILITY
