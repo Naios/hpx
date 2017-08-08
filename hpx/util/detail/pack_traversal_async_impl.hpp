@@ -65,8 +65,6 @@ namespace util {
         bool async_traverse(Frame&& frame,
             static_async_range<Target, Sequence...> range, Rest&&... rest)
         {
-            
-
             return false;
         }
 
