@@ -8,9 +8,8 @@
 
 #include <hpx/config.hpp>
 #include <hpx/traits/is_callable.hpp>
-#include <hpx/traits/is_range.hpp>
-#include <hpx/traits/is_tuple_like.hpp>
 #include <hpx/util/always_void.hpp>
+#include <hpx/util/detail/container_category.hpp>
 #include <hpx/util/detail/pack.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
@@ -534,20 +533,20 @@ namespace util {
             /// \tparam CanReuse Identifies whether the container can be
             ///         re-used through the mapping.
             template <bool IsEmptyMapped, bool CanReuse>
-            struct container_category_tag
+            struct container_mapping_tag
             {
             };
 
-            /// Categorizes the given container through a container_category_tag
+            /// Categorizes the given container through a container_mapping_tag
             template <typename T, typename M>
-            using container_category_of_t =
-                container_category_tag<is_empty_mapped<T, M>::value,
+            using container_mapping_tag_of_t =
+                container_mapping_tag<is_empty_mapped<T, M>::value,
                     can_reuse<T, M>::value>;
 
             /// We create a new container, which may hold the resulting type
             template <typename M, typename T>
             auto remap_container(
-                container_category_tag<false, false>, M&& mapper, T&& container)
+                container_mapping_tag<false, false>, M&& mapper, T&& container)
                 -> decltype(
                     rebind_container<mapped_type_from_t<T, M>>(container))
             {
@@ -583,8 +582,8 @@ namespace util {
             /// The remapper optimized for the case that we map to the same
             /// type we accepted such as int -> int.
             template <typename M, typename T>
-            auto remap_container(container_category_tag<false, true>,
-                M&& mapper, T&& container) -> typename std::decay<T>::type
+            auto remap_container(container_mapping_tag<false, true>, M&& mapper,
+                T&& container) -> typename std::decay<T>::type
             {
                 for (auto&& val :
                     container_accessor_of(std::forward<T>(container)))
@@ -597,9 +596,8 @@ namespace util {
 
             /// Remap the container to zero arguments
             template <typename M, typename T>
-            auto remap_container(
-                container_category_tag<true, false>, M&& mapper, T&& container)
-                -> decltype(spreading::empty_spread())
+            auto remap_container(container_mapping_tag<true, false>, M&& mapper,
+                T&& container) -> decltype(spreading::empty_spread())
             {
                 for (auto&& val :
                     container_accessor_of(std::forward<T>(container)))
@@ -624,10 +622,10 @@ namespace util {
 #endif
                 >
             auto remap(strategy_remap_tag, T&& container, M&& mapper)
-                -> decltype(remap_container(container_category_of_t<T, M>{},
+                -> decltype(remap_container(container_mapping_tag_of_t<T, M>{},
                     std::forward<M>(mapper), std::forward<T>(container)))
             {
-                return remap_container(container_category_of_t<T, M>{},
+                return remap_container(container_mapping_tag_of_t<T, M>{},
                     std::forward<M>(mapper), std::forward<T>(container));
             }
 
@@ -772,18 +770,6 @@ namespace util {
             }
         }    // end namespace tuple_like_remapping
 
-        /// Tag for dispatching based on the tuple like
-        /// or container requirements
-        template <bool IsContainer, bool IsTupleLike>
-        struct container_match_tag
-        {
-        };
-
-        template <typename T>
-        using container_match_of =
-            container_match_tag<traits::is_range<T>::value,
-                traits::is_tuple_like<T>::value>;
-
         /// Base class for making strategy dependent behaviour available
         /// to the mapping_helper class.
         template <typename Strategy>
@@ -885,21 +871,22 @@ namespace util {
             /// because some compilers (MSVC) tend to instantiate the invocation
             /// before matching the tag, which leads to build failures.
             template <typename T>
-            auto match(container_match_tag<false, false>, T&& element)
+            auto match(container_category_tag<false, false>, T&& element)
                 -> decltype(std::declval<mapping_helper>().invoke_mapper(
                     std::forward<T>(element)));
 
             /// SFINAE helper for elements satisfying the container
             /// requirements, which are not tuple like.
             template <typename T>
-            auto match(container_match_tag<true, false>, T&& container)
+            auto match(container_category_tag<true, false>, T&& container)
                 -> decltype(container_remapping::remap(Strategy{},
                     std::forward<T>(container), std::declval<traversor>()));
 
             /// SFINAE helper for elements which are tuple like and
             /// that also may satisfy the container requirements
             template <bool IsContainer, typename T>
-            auto match(container_match_tag<IsContainer, true>, T&& tuple_like)
+            auto match(
+                container_category_tag<IsContainer, true>, T&& tuple_like)
                 -> decltype(tuple_like_remapping::remap(Strategy{},
                     std::forward<T>(tuple_like),
                     std::declval<traversor>()));
@@ -926,7 +913,7 @@ namespace util {
             /// because some compilers (MSVC) tend to instantiate the invocation
             /// before matching the tag, which leads to build failures.
             template <typename T>
-            auto try_match(container_match_tag<false, false>, T&& element)
+            auto try_match(container_category_tag<false, false>, T&& element)
                 -> decltype(std::declval<mapping_helper>().invoke_mapper(
                     std::forward<T>(element)))
             {
@@ -938,7 +925,7 @@ namespace util {
             /// Match elements satisfying the container requirements,
             /// which are not tuple like.
             template <typename T>
-            auto try_match(container_match_tag<true, false>, T&& container)
+            auto try_match(container_category_tag<true, false>, T&& container)
                 -> decltype(container_remapping::remap(Strategy{},
                     std::forward<T>(container), std::declval<try_traversor>()))
             {
@@ -951,7 +938,7 @@ namespace util {
             /// -> We match tuple like types over container like ones
             template <bool IsContainer, typename T>
             auto try_match(
-                container_match_tag<IsContainer, true>, T&& tuple_like)
+                container_category_tag<IsContainer, true>, T&& tuple_like)
                 -> decltype(tuple_like_remapping::remap(Strategy{},
                     std::forward<T>(tuple_like), std::declval<try_traversor>()))
             {
@@ -966,23 +953,23 @@ namespace util {
             template <typename T>
             auto traverse(Strategy, T&& element)
                 -> decltype(std::declval<mapping_helper>().match(
-                    std::declval<
-                        container_match_of<typename std::decay<T>::type>>(),
+                    std::declval<container_category_of_t<
+                        typename std::decay<T>::type>>(),
                     std::declval<T>()));
 
             /// \copybrief traverse
             template <typename T>
             auto try_traverse(Strategy, T&& element)
                 -> decltype(std::declval<mapping_helper>().try_match(
-                    std::declval<
-                        container_match_of<typename std::decay<T>::type>>(),
+                    std::declval<container_category_of_t<
+                        typename std::decay<T>::type>>(),
                     std::declval<T>()))
             {
                 // We use tag dispatching here, to categorize the type T whether
                 // it satisfies the container or tuple like requirements.
                 // Then we can choose the underlying implementation accordingly.
                 return try_match(
-                    container_match_of<typename std::decay<T>::type>{},
+                    container_category_of_t<typename std::decay<T>::type>{},
                     std::forward<T>(element));
             }
 
