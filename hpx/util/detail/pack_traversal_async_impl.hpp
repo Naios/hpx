@@ -45,8 +45,8 @@ namespace util {
             tuple<Args...> args_;
 
         public:
-            explicit HPX_CONSTEXPR async_traversal_frame(
-                Visitor visitor, Args... args)
+            explicit HPX_CONSTEXPR async_traversal_frame(Visitor visitor,
+                Args... args)
               : visitor_(std::move(visitor))
               , args_(util::make_tuple(std::move(args)...))
             {
@@ -89,11 +89,6 @@ namespace util {
             }
         };
 
-        template <typename From, typename To>
-        struct async_range
-        {
-        };
-
         template <typename Target, std::size_t Begin, std::size_t End>
         struct static_async_range
         {
@@ -122,104 +117,114 @@ namespace util {
             }
         };
 
-        /// Async traverse a single element, and do nothing.
-        /// This function is matched last.
-        template <typename Frame, typename Matcher, typename Current,
-            typename... Hierarchy>
-        void async_traverse_one_impl(
-            Matcher, Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
+        /// Represents a particular point in a asynchronous traversal hierarchy
+        template <typename Frame, typename Hierarchy>
+        class async_traversal_point
         {
-            // Do nothing if the visitor does't accept the type
-        }
+            Frame frame_;
+            Hierarchy hierarchy_;
 
-        /// Async traverse a single element which isn't a container or
-        /// tuple like type. This function is SFINAEd out if the element isn't
-        /// accepted by the visitor.
-        ///
-        /// \throws async_traversal_detached_exception If the execution context
-        ///                                            was detached.
-        template <typename Frame, typename Current, typename... Hierarchy>
-        auto async_traverse_one_impl(container_category_tag<false, false>,
-            Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
-            /// SFINAE this out, if the visitor doesn't accept the given element
-            -> typename always_void<decltype(frame->traverse(*current))>::type
-        {
-            if (!frame->traverse(*current))
+        public:
+            explicit async_traversal_point(Frame frame, Hierarchy hierarchy)
+              : frame_(std::move(frame))
+              , hierarchy_(std::move(hierarchy))
             {
-                // Store the current call hierarchy into a tuple for
-                // later reentrance.
-                auto state = util::make_tuple(std::forward<Current>(current),
-                    std::forward<Hierarchy>(hierarchy)...);
-
-                // If the traversal method returns false, we detach the
-                // current execution context and call the visitor with the
-                // element and a continue callable object again.
-                frame->async_continue(*current, std::move(state));
-
-                // Then detach the current execution context through throwing
-                // an async_traversal_detached_exception which is catched
-                // below the traversal call hierarchy.
-                throw async_traversal_detached_exception{};
             }
-        }
 
-        /// Async traverse a single element which is a container or
-        /// tuple like type.
-        template <bool IsTupleLike, typename Frame, typename Current,
-            typename... Hierarchy>
-        void async_traverse_one_impl(container_category_tag<false, IsTupleLike>,
-            Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
-        {
-        }
+            /// Async traverse a single element, and do nothing.
+            /// This function is matched last.
+            template <typename Matcher, typename Current>
+            void async_traverse_one_impl(Matcher, Current&& current)
+            {
+                // Do nothing if the visitor does't accept the type
+            }
 
-        /// Async traverse a single element which is a tuple like type only.
-        template <typename Frame, typename Current, typename... Hierarchy>
-        void async_traverse_one_impl(container_category_tag<true, false>,
-            Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
-        {
-        }
+            /// Async traverse a single element which isn't a container or
+            /// tuple like type. This function is SFINAEd out if the element
+            /// isn't accepted by the visitor.
+            ///
+            /// \throws async_traversal_detached_exception If the execution
+            ///         context was detached, an exception is thrown to
+            ///         stop the traversal.
+            template <typename Current>
+            auto async_traverse_one_impl(container_category_tag<false, false>,
+                Current&& current)
+                /// SFINAE this out, if the visitor doesn't accept
+                /// the given element
+                -> typename always_void<decltype(
+                    std::declval<Frame>()->traverse(*current))>::type
+            {
+                if (!frame_->traverse(*current))
+                {
+                    // Store the current call hierarchy into a tuple for
+                    // later reentrance.
+                    auto state = util::tuple_cat(
+                        util::make_tuple(std::forward<Current>(current)),
+                        std::move(hierarchy_));
 
-        /// Async traverse the current iterator
-        template <typename Frame, typename Current, typename... Hierarchy>
-        void async_traverse_one(
-            Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
-        {
-            using ElementType = typename std::decay<decltype(*current)>::type;
-            return async_match_impl(container_category_of_t<ElementType>{},
-                std::forward<Frame>(frame), std::forward<Current>(current),
-                std::forward<Hierarchy>(hierarchy));
-        }
+                    // If the traversal method returns false, we detach the
+                    // current execution context and call the visitor with the
+                    // element and a continue callable object again.
+                    frame_->async_continue(*current, std::move(state));
 
-        template <typename Frame, std::size_t... Sequence, typename Current,
-            typename... Hierarchy>
-        void async_traverse_static_async_range(Frame& frame,
-            pack_c<std::size_t, Sequence...>, Current&& current,
-            Hierarchy&&... hierarchy)
-        {
-            int dummy[] = {0,
-                ((void) async_traverse_one(
-                     current.template relocate<Sequence>(), hierarchy...),
-                    0)...};
-            (void) dummy;
-        }
+                    // Then detach the current execution context through throwing
+                    // an async_traversal_detached_exception which is catched
+                    // below the traversal call hierarchy.
+                    throw async_traversal_detached_exception{};
+                }
+            }
 
-        template <typename Frame, typename Target, std::size_t Begin,
-            std::size_t End, typename... Hierarchy>
-        void async_traverse(Frame&& frame,
-            static_async_range<Target, Begin, End>
-                current,
-            Hierarchy&&... hierarchy)
-        {
-            async_traverse_static_async_range(std::forward<Frame>(frame),
-                explicit_range_sequence_of_t<Begin, End>{},
-                current,
-                std::forward<Hierarchy>(hierarchy)...);
-        }
+            /// Async traverse a single element which is a container or
+            /// tuple like type.
+            template <bool IsTupleLike, typename Current>
+            void async_traverse_one_impl(
+                container_category_tag<false, IsTupleLike>,
+                Current&& current)
+            {
+            }
+
+            /// Async traverse a single element which is a tuple like type only.
+            template <typename Current>
+            void async_traverse_one_impl(container_category_tag<true, false>,
+                Current&& current)
+            {
+            }
+
+            /// Async traverse the current iterator
+            template <typename Current>
+            void async_traverse_one(Current&& current)
+            {
+                using ElementType =
+                    typename std::decay<decltype(*current)>::type;
+                return async_match_impl(container_category_of_t<ElementType>{},
+                    std::forward<Current>(current));
+            }
+
+            template <std::size_t... Sequence, typename Current>
+            void async_traverse_static_async_range(
+                pack_c<std::size_t, Sequence...>,
+                Current&& current)
+            {
+                int dummy[] = {0,
+                    ((void) async_traverse_one(
+                         current.template relocate<Sequence>()),
+                        0)...};
+                (void) dummy;
+            }
+
+            template <typename Target, std::size_t Begin, std::size_t End>
+            void async_traverse(static_async_range<Target, Begin, End> current)
+            {
+                async_traverse_static_async_range(
+                    explicit_range_sequence_of_t<Begin, End>{}, current);
+            }
+        };
 
         /// Reenter an asynchronous iterator pack and continue its traversal.
         template <typename Current, typename Next, typename... Hierarchy>
-        bool resume_traversal(
-            Current& current, Next& next, Hierarchy&... hierarchy)
+        bool resume_traversal(Current& current,
+            Next& next,
+            Hierarchy&... hierarchy)
         {
             try
             {
