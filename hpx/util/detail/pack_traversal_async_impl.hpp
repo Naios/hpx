@@ -123,37 +123,21 @@ namespace util {
             }
         };
 
-        template <typename T>
-        auto async_match_impl(container_match_tag<false, false>, T&& element)
+        template <typename Frame, typename Matcher, typename Current,
+            typename... Hierarchy>
+        void async_traverse_one_impl(
+            Matcher, Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
         {
-        }
-
-        template <typename T, bool IsTupleLike>
-        auto async_match_impl(
-            container_match_tag<true, IsTupleLike>, T&& element)
-        {
-        }
-
-        template <typename T>
-        auto async_match_impl(container_match_tag<false, true>, T&& tuple_like)
-        {
-        }
-
-        template <typename T>
-        auto async_match(T&& element) -> decltype(
-            async_match_impl(container_match_of<typename std::decay<T>::type>{},
-                std::forward<T>(element)))
-        {
-            return async_match_impl(
-                container_match_of<typename std::decay<T>::type>{},
-                std::forward<T>(element));
+            // Do nothing if the visitor does't accept the type
         }
 
         /// \throws async_traversal_detached_exception If the execution context
         ///                                            was detached.
         template <typename Frame, typename Current, typename... Hierarchy>
-        void async_traverse_one(Frame&& frame, Current&& current,
-            Hierarchy&&... hierarchy) noexcept(false)
+        auto async_traverse_one_impl(container_match_tag<false, false>,
+            Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
+            /// SFINAE this out, if the visitor doesn't accept the given element
+            -> typename always_void<decltype(frame->traverse(*current))>::type
         {
             if (!frame->traverse(*current))
             {
@@ -172,6 +156,29 @@ namespace util {
                 // below the traversal call hierarchy.
                 throw async_traversal_detached_exception{};
             }
+        }
+
+        template <bool IsTupleLike, typename Frame, typename Current,
+            typename... Hierarchy>
+        void async_traverse_one_impl(container_match_tag<false, IsTupleLike>,
+            Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
+        {
+        }
+
+        template <typename Frame, typename Current, typename... Hierarchy>
+        void async_traverse_one_impl(container_match_tag<true, false>,
+            Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
+        {
+        }
+
+        template <typename Frame, typename Current, typename... Hierarchy>
+        void async_traverse_one(
+            Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
+        {
+            using ElementType = typename std::decay<decltype(*current)>::type;
+            return async_match_impl(container_match_of<ElementType>{},
+                std::forward<Frame>(frame), std::forward<Current>(current),
+                std::forward<Hierarchy>(hierarchy));
         }
 
         template <typename Frame, std::size_t... Sequence, typename Current,
@@ -202,7 +209,8 @@ namespace util {
 
         /// Reenter an asynchronous iterator pack and continue its traversal.
         template <typename Current, typename Next, typename... Hierarchy>
-        bool reenter(Current& current, Next& next, Hierarchy&... hierarchy)
+        bool resume_traversal(
+            Current& current, Next& next, Hierarchy&... hierarchy)
         {
             try
             {
