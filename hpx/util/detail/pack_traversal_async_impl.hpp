@@ -221,10 +221,24 @@ namespace util {
         };
 
         /// Reenter an asynchronous iterator pack and continue its traversal.
+        template <typename Current>
+        bool resume_traversal(Current&& current)
+        {
+            try
+            {
+                async_traverse(std::forward<Current>(current));
+                return true;
+            }
+            catch (async_traversal_detached_exception const&)
+            {
+                return false;
+            }
+        }
+        /// Reenter an asynchronous iterator pack and continue its traversal.
         template <typename Current, typename Next, typename... Hierarchy>
-        bool resume_traversal(Current& current,
-            Next& next,
-            Hierarchy&... hierarchy)
+        bool resume_traversal(Current&& current,
+            Next&& next,
+            Hierarchy&&... hierarchy)
         {
             try
             {
