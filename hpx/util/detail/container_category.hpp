@@ -3,8 +3,8 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef HPX_UTIL_DETAIL_CONTAINER_CATEGORY_IMPL_HPP
-#define HPX_UTIL_DETAIL_CONTAINER_CATEGORY_IMPL_HPP
+#ifndef HPX_UTIL_DETAIL_CONTAINER_CATEGORY_HPP
+#define HPX_UTIL_DETAIL_CONTAINER_CATEGORY_HPP
 
 #include <hpx/config.hpp>
 #include <hpx/traits/is_range.hpp>
@@ -29,4 +29,4 @@ namespace util {
 }    // end namespace util
 }    // end namespace hpx
 
-#endif    // HPX_UTIL_DETAIL_CONTAINER_CATEGORY_IMPL_HPP
+#endif    // HPX_UTIL_DETAIL_CONTAINER_CATEGORY_HPP
