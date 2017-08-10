@@ -22,9 +22,25 @@
 namespace hpx {
 namespace util {
     namespace detail {
+        /// Relocates the given pack with the given offset
+        template <std::size_t Offset, typename Pack>
+        struct relocate_index_pack;
+        template <std::size_t Offset, std::size_t... Sequence>
+        struct relocate_index_pack<Offset, pack_c<std::size_t, Sequence...>>
+          : std::common_type<pack_c<std::size_t, (Sequence + Offset)...>>
+        {
+        };
+
+        /// Creates a sequence from begin to end explicitly
+        template <std::size_t Begin, std::size_t End>
+        using explicit_range_sequence_of_t = typename relocate_index_pack<Begin,
+            typename make_index_pack<End - Begin>::type>::type;
+
         /// Stores the visitor and the arguments to traverse
         template <typename Visitor, typename... Args>
         class async_traversal_frame
+          : public std::enable_shared_from_this<
+                async_traversal_frame<Visitor, Args...>>
         {
             Visitor visitor_;
             tuple<Args...> args_;
@@ -49,6 +65,15 @@ namespace util {
                 -> decltype(util::invoke(visitor_, std::forward<T>(value)))
             {
                 return util::invoke(visitor_, std::forward<T>(value));
+            }
+
+            /// Calls the visitor with the given element and a continuation
+            /// which is capable of continuing the asynchrone traversal
+            /// when it's called later.
+            template <typename T, typename Hierarchy>
+            void async_continue(T&& value, Hierarchy&& hierarchy)
+            {
+                // TODO
             }
         };
 
@@ -81,18 +106,28 @@ namespace util {
                 return util::get<Begin>(target_);
             }
 
-            /*HPX_CONSTEXPR static_async_range<Target, Rest...> shift() const
-                noexcept
+            template <std::size_t Position>
+            HPX_CONSTEXPR static_async_range<Target, Position, End> relocate()
+                const noexcept
             {
-                return static_async_range<Target, Rest...>{target_};
-            }*/
+                return static_async_range<Target, Position, End>{target_};
+            }
+        };
+        /// Specialization for the end marker which doesn't provide
+        /// a particular element dereference
+        template <typename Target, std::size_t Begin>
+        struct static_async_range<Target, Begin, Begin>
+        {
+            explicit static_async_range(Target*)
+            {
+            }
         };
 
         /// \throws async_traversal_detached_exception If the execution context
         ///                                            was detached.
         template <typename Frame, typename Current, typename... Hierarchy>
-        void async_traverse_one(
-            Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
+        void async_traverse_one(Frame&& frame, Current&& current,
+            Hierarchy&&... hierarchy) noexcept(false)
         {
             if (!frame->traverse(*current))
             {
@@ -113,32 +148,30 @@ namespace util {
             }
         }
 
-        template <typename Frame, std::size_t... Sequence, typename Range,
+        template <typename Frame, std::size_t... Sequence, typename Current,
             typename Hierarchy>
-        bool async_traverse_static_async_range(Frame& frame,
-            pack_c<std::size_t, Sequence...>, Range& range,
-            Hierarchy&&... hierarchy) noexcept(false)
+        void async_traverse_static_async_range(Frame& frame,
+            pack_c<std::size_t, Sequence...>, Current&& current,
+            Hierarchy&&... hierarchy)
         {
-            bool proceed = false;
-
-            auto invoker = [&](auto&& element) {
-                if (proceed)
-                {
-                    proceed = async_traverse_one(element, hierarchy);
-                }
-            };
-
-            int dummy[] = {0, ((void) (range.template at<Sequence>()), 0)...};
+            int dummy[] = {0,
+                ((void) async_traverse_one(
+                     current.template relocate<Sequence>(), hierarchy...),
+                    0)...};
             (void) dummy;
-
-            return proceed;
         }
 
         template <typename Frame, typename Target, std::size_t Begin,
-            std::size_t End, typename Rest>
-        bool async_traverse(Frame& frame,
-            static_async_range<Target, Begin, End> range, Rest& rest)
+            std::size_t End, typename... Hierarchy>
+        void async_traverse(Frame&& frame,
+            static_async_range<Target, Begin, End>
+                current,
+            Hierarchy&&... hierarchy)
         {
+            async_traverse_static_async_range(std::forward<Frame>(frame),
+                explicit_range_sequence_of_t<Begin, End>{},
+                current,
+                std::forward<Hierarchy>(hierarchy)...);
         }
 
         /// Reenter an asynchronous iterator pack and continue its traversal.
