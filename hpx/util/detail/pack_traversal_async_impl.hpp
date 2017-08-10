@@ -123,6 +123,32 @@ namespace util {
             }
         };
 
+        template <typename T>
+        auto async_match_impl(container_match_tag<false, false>, T&& element)
+        {
+        }
+
+        template <typename T, bool IsTupleLike>
+        auto async_match_impl(
+            container_match_tag<true, IsTupleLike>, T&& element)
+        {
+        }
+
+        template <typename T>
+        auto async_match_impl(container_match_tag<false, true>, T&& tuple_like)
+        {
+        }
+
+        template <typename T>
+        auto async_match(T&& element) -> decltype(
+            async_match_impl(container_match_of<typename std::decay<T>::type>{},
+                std::forward<T>(element)))
+        {
+            return async_match_impl(
+                container_match_of<typename std::decay<T>::type>{},
+                std::forward<T>(element));
+        }
+
         /// \throws async_traversal_detached_exception If the execution context
         ///                                            was detached.
         template <typename Frame, typename Current, typename... Hierarchy>
