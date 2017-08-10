@@ -52,19 +52,16 @@ namespace util {
             }
         };
 
+        /// An internally used exception to detach the current execution context
         struct async_traversal_detached_exception : std::exception
         {
             explicit async_traversal_detached_exception()
             {
             }
 
-            ~async_traversal_detached_exception() throw()
+            char const* what() const override
             {
-            }
-
-            const char* what() const throw()
-            {
-                return "";
+                return "The execution context was detached!";
             }
         };
 
@@ -78,11 +75,11 @@ namespace util {
         {
             Target* target_;
 
-            /*HPX_CONSTEXPR auto operator*() const noexcept
-                -> decltype(util::get<Current>(target_))
+            HPX_CONSTEXPR auto operator*() const noexcept
+                -> decltype(util::get<Begin>(target_))
             {
-                return util::get<Current>(target_);
-            }*/
+                return util::get<Begin>(target_);
+            }
 
             /*HPX_CONSTEXPR static_async_range<Target, Rest...> shift() const
                 noexcept
@@ -91,42 +88,43 @@ namespace util {
             }*/
         };
 
-        template <typename Frame, typename Current, typename Capture>
+        /// \throws async_traversal_detached_exception If the execution context
+        ///                                            was detached.
+        template <typename Frame, typename Current, typename... Hierarchy>
         void async_traverse_one(
-            Frame&& frame, Current&& element, Capture&& capture)
+            Frame&& frame, Current&& current, Hierarchy&&... hierarchy)
         {
-            if (frame->traverse(*element))
+            if (!frame->traverse(*current))
             {
-                // The Traversal should continue synchronously
-                return;
+                // Store the current call hierarchy into a tuple for
+                // later reentrance.
+                auto state = util::make_tuple(std::forward<Current>(current),
+                    std::forward<Hierarchy>(hierarchy)...);
+
+                // If the traversal method returns false, we detach the
+                // current execution context and call the visitor with the
+                // element and a continue callable object again.
+                frame->async_continue(*current, std::move(state));
+
+                // Then detach the current execution context through throwing
+                // an async_traversal_detached_exception which is catched
+                // below the traversal call hierarchy.
+                throw async_traversal_detached_exception{};
             }
-
-            // If the traversal method returns false, we detach the
-            // current execution context and call the visitor with the
-            // element and a continue callable object again.
-
-            // TODO
-
-            proceed = false;
         }
 
-        /*template<std::size_t I, typename Frame, typename Range, typename Rest>
-        void invoke_static_async_range(Frame& frame, Range& range, Rest &rest)
-        {
-            async_traverse_one(range.template<I> adjust()
-        }*/
-
         template <typename Frame, std::size_t... Sequence, typename Range,
-            typename Rest>
+            typename Hierarchy>
         bool async_traverse_static_async_range(Frame& frame,
-            pack_c<std::size_t, Sequence...>, Range& range, Rest& rest)
+            pack_c<std::size_t, Sequence...>, Range& range,
+            Hierarchy&&... hierarchy) noexcept(false)
         {
             bool proceed = false;
 
             auto invoker = [&](auto&& element) {
                 if (proceed)
                 {
-                    proceed = async_traverse_one(element, rest);
+                    proceed = async_traverse_one(element, hierarchy);
                 }
             };
 
@@ -144,17 +142,22 @@ namespace util {
         }
 
         /// Reenter an asynchronous iterator pack and continue its traversal.
-        template <typename Current, typename Next, typename... Rest>
-        bool reenter(Current& current, Next& next, Rest&... rest)
+        template <typename Current, typename Next, typename... Hierarchy>
+        bool reenter(Current& current, Next& next, Hierarchy&... hierarchy)
         {
-            if (async_traverse(std::forward<Current>(current),
-                    util::forward_as_tuple(std::forward<Next>(next),
-                        std::forward<Rest>(current)...)))
+            try
             {
+                /// TODO Resolve the recursion here
+                async_traverse(std::forward<Current>(current),
+                    util::forward_as_tuple(std::forward<Next>(next),
+                        std::forward<Hierarchy>(hierarchy)...));
                 return reenter(std::forward<Next>(next).shift(),
-                    std::forward<Rest>(current)...);
+                    std::forward<Hierarchy>(hierarchy)...);
             }
-            return false;
+            catch (async_traversal_detached_exception const&)
+            {
+                return false;
+            }
         }
 
         /// Traverses the given pack with the given mapper
