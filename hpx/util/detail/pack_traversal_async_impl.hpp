@@ -11,6 +11,7 @@
 #include <hpx/util/detail/pack_traversal_impl.hpp>
 #include <hpx/util/invoke.hpp>
 
+#include <functional>    // reference_wrapper
 #include <memory>
 #include <tuple>
 #include <type_traits>
@@ -58,13 +59,34 @@ namespace util {
         struct static_async_range
         {
             Target* target_;
+
+            HPX_CONSTEXPR Target* operator*() const noexcept
+            {
+                return target_;
+            }
         };
 
+        /// Trav
         template <typename Frame, typename Target, std::size_t... Sequence,
             typename... Rest>
-        bool async_traverse(Frame&& frame,
-            static_async_range<Target, Sequence...> range, Rest&&... rest)
+        bool async_traverse(Frame& frame,
+            static_async_range<Target, Sequence...> range, Rest&... rest)
         {
+            bool aborted = false;
+
+            return aborted;
+        }
+
+        /// Reenter an asynchronous iterator pack
+        template <typename Current, typename Next, typename... Rest>
+        bool reenter(Current& current, Next& next, Rest&... rest)
+        {
+            if (async_traverse(std::forward<Current>(current),
+                    std::forward<Next>(next), std::forward<Rest>(current)...))
+            {
+                return reenter(std::forward<Next>(next).shift(),
+                    std::forward<Rest>(current)...);
+            }
             return false;
         }
 
