@@ -11,6 +11,7 @@
 #include <hpx/util/detail/container_category.hpp>
 #include <hpx/util/detail/pack.hpp>
 #include <hpx/util/invoke.hpp>
+#include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/tuple.hpp>
 
 #include <exception>
@@ -64,11 +65,6 @@ namespace util {
             return resume_traversal_callable<typename std::decay<Frame>::type,
                 typename std::decay<State>::type>(
                 std::forward<Frame>(frame), std::forward<State>(state));
-        }
-
-        template <typename Frame, typename State>
-        void resume_traversal_callable<Frame, State>::operator()()
-        {
         }
 
         /// Stores the visitor and the arguments to traverse
@@ -289,47 +285,62 @@ namespace util {
             async_traversal_point<typename std::decay<Frame>::type,
                 typename std::decay<Hierarchy>::type...>;
 
-        /// Reenter an asynchronous iterator pack and continue its traversal.
-        template <typename Frame, typename Current>
-        void resume_traversal(Frame&& frame, Current&& current)
+        /// A callable object which is cabale of resuming an asynchronous
+        /// pack traversal.
+        struct resume_state_callable
         {
-            try
+            /// Reenter an asynchronous iterator pack and continue
+            /// its traversal.
+            template <typename Frame, typename Current>
+            void operator()(Frame&& frame, Current&& current) const
             {
-                traversal_point_of_t<Frame> point(std::forward<Frame>(frame));
+                try
+                {
+                    traversal_point_of_t<Frame> point(
+                        std::forward<Frame>(frame));
 
-                point.async_traverse(std::forward<Current>(current));
+                    point.async_traverse(std::forward<Current>(current));
 
-                // Complete the asynchrnous traversal when the last iterator
-                // was processed to its end.
-                frame->async_complete();
+                    // Complete the asynchrnous traversal when the last iterator
+                    // was processed to its end.
+                    frame->async_complete();
+                }
+                catch (async_traversal_detached_exception const&)
+                {
+                    // Do nothing here since the exception was just meant
+                    // for terminating the control flow.
+                }
             }
-            catch (async_traversal_detached_exception const&)
+            /// Reenter an asynchronous iterator pack and continue its traversal.
+            template <typename Frame, typename Current, typename Next,
+                typename... Hierarchy>
+            void operator()(Frame&& frame, Current&& current, Next&& next,
+                Hierarchy&&... hierarchy) const
             {
-                // Do nothing here since the exception was just meant
-                // for terminating the control flow.
-            }
-        }
-        /// Reenter an asynchronous iterator pack and continue its traversal.
-        template <typename Frame, typename Current, typename Next,
-            typename... Hierarchy>
-        void resume_traversal(Frame&& frame, Current&& current, Next&& next,
-            Hierarchy&&... hierarchy)
-        {
-            traversal_point_of_t<Frame, Next, Hierarchy...> point(
-                std::forward<Frame>(frame), std::forward<Next>(next),
-                std::forward<Hierarchy>(hierarchy)...);
-
-            try
-            {
-                point.async_traverse(std::forward<Current>(current));
-                resume_traversal(std::forward<Next>(next).shift(),
+                traversal_point_of_t<Frame, Next, Hierarchy...> point(
+                    std::forward<Frame>(frame), std::forward<Next>(next),
                     std::forward<Hierarchy>(hierarchy)...);
+
+                try
+                {
+                    point.async_traverse(std::forward<Current>(current));
+                    resume_traversal(std::forward<Next>(next).shift(),
+                        std::forward<Hierarchy>(hierarchy)...);
+                }
+                catch (async_traversal_detached_exception const&)
+                {
+                    // Do nothing here since the exception was just meant
+                    // for terminating the control flow.
+                }
             }
-            catch (async_traversal_detached_exception const&)
-            {
-                // Do nothing here since the exception was just meant
-                // for terminating the control flow.
-            }
+        };
+
+        template <typename Frame, typename State>
+        void resume_traversal_callable<Frame, State>::operator()()
+        {
+            auto all = util::tuple_cat(
+                util::make_tuple(std::move(frame_)), std::move(state_));
+            util::invoke_fused(resume_state_callable{}, std::move(all));
         }
 
         /// Traverses the given pack with the given mapper
@@ -349,7 +360,7 @@ namespace util {
             auto range = make_static_range(frame->head());
 
             // Start the asynchronous traversal
-            resume_traversal(std::move(frame), std::move(range));
+            resume_state_callable{}(std::move(frame), std::move(range));
         }
     }    // end namespace detail
 }    // end namespace util
