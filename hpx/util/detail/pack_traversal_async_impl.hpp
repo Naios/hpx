@@ -149,6 +149,12 @@ namespace util {
             {
                 return static_async_range<Target, Position, End>{target_};
             }
+
+            HPX_CONSTEXPR static_async_range<Target, Begin + 1, End> next()
+                const noexcept
+            {
+                return static_async_range<Target, Begin + 1, End>{target_};
+            }
         };
         /// Specialization for the end marker which doesn't provide
         /// a particular element dereference
@@ -216,7 +222,7 @@ namespace util {
                     // Store the current call hierarchy into a tuple for
                     // later reentrance.
                     auto state = util::tuple_cat(
-                        util::make_tuple(std::forward<Current>(current)),
+                        util::make_tuple(current.next()),
                         std::move(hierarchy_));
 
                     // If the traversal method returns false, we detach the
@@ -245,6 +251,7 @@ namespace util {
             void async_traverse_one_impl(container_category_tag<true, false>,
                 Current&& current)
             {
+                // TODO
             }
 
             /// Async traverse the current iterator
