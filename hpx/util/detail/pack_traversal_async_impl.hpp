@@ -117,6 +117,20 @@ namespace util {
             }
         };
 
+        /// Deduces to the static range type for the given type
+        template <typename T>
+        using begin_static_range_of_t =
+            static_async_range<typename std::decay<T>::type, 0U,
+                util::tuple_size<typename std::decay<T>::type>::value>;
+
+        /// Returns a static begin iterator for the given type
+        template <typename T>
+        begin_static_range_of_t<T> begin_static_range(T&& element)
+        {
+            auto pointer = std::addressof(element);
+            return begin_static_range_of_t<T>{pointer};
+        }
+
         /// Represents a particular point in a asynchronous traversal hierarchy
         template <typename Frame, typename Hierarchy>
         class async_traversal_point
@@ -221,8 +235,8 @@ namespace util {
         };
 
         /// Reenter an asynchronous iterator pack and continue its traversal.
-        template <typename Current>
-        bool resume_traversal(Current&& current)
+        template <typename Frame, typename Current>
+        bool resume_traversal(Frame&& frame, Current&& current)
         {
             try
             {
@@ -235,9 +249,9 @@ namespace util {
             }
         }
         /// Reenter an asynchronous iterator pack and continue its traversal.
-        template <typename Current, typename Next, typename... Hierarchy>
-        bool resume_traversal(Current&& current,
-            Next&& next,
+        template <typename Frame, typename Current, typename Next,
+            typename... Hierarchy>
+        bool resume_traversal(Frame&& frame, Current&& current, Next&& next,
             Hierarchy&&... hierarchy)
         {
             try
@@ -263,10 +277,16 @@ namespace util {
                 async_traversal_frame<typename std::decay<Mapper>::type,
                     typename std::decay<T>::type...>;
 
+            // Create the frame on the heap which stores the arguments
+            // to traverse asynchronous.
             auto frame = std::make_shared<FrameType>(
                 std::forward<Mapper>(mapper), std::forward<T>(pack));
 
-            frame->head();
+            // Create a static range for the top level tuple
+            auto range = begin_static_range(frame->head());
+
+            // Start the asynchronous traversal
+            resume_traversal(std::move(frame), std::move(range));
         }
     }    // end namespace detail
 }    // end namespace util
