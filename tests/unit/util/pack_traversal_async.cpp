@@ -14,7 +14,7 @@ struct async_int_visitor
 {
     bool operator()(int& i) const
     {
-        return bool(i % 2);
+        return false;
     }
 
     template <typename N>
