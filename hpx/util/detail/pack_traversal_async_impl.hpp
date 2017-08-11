@@ -74,6 +74,13 @@ namespace util {
             {
                 // TODO
             }
+
+            /// Calls the visitor with no arguments to signalize that the
+            /// asynchrnous traversal was finished.
+            void async_complete()
+            {
+                // TODO
+            }
         };
 
         /// An internally used exception to detach the current execution context
@@ -95,9 +102,9 @@ namespace util {
             Target* target_;
 
             HPX_CONSTEXPR auto operator*() const noexcept
-                -> decltype(util::get<Begin>(target_))
+                -> decltype(util::get<Begin>(*target_))
             {
-                return util::get<Begin>(target_);
+                return util::get<Begin>(*target_);
             }
 
             template <std::size_t Position>
@@ -234,38 +241,53 @@ namespace util {
             }
         };
 
+        /// Deduces to the traversal point class of the
+        /// given frame and hierarchy
+        template <typename Frame, typename... Hierarchy>
+        using traversal_point_of_t =
+            async_traversal_point<typename std::decay<Frame>::type,
+                typename std::decay<Hierarchy>::type...>;
+
         /// Reenter an asynchronous iterator pack and continue its traversal.
         template <typename Frame, typename Current>
-        bool resume_traversal(Frame&& frame, Current&& current)
+        void resume_traversal(Frame&& frame, Current&& current)
         {
             try
             {
-                async_traverse(std::forward<Current>(current));
-                return true;
+                traversal_point_of_t<Frame> point(std::forward<Frame>(frame));
+
+                point.async_traverse(std::forward<Current>(current));
+
+                // Complete the asynchrnous traversal when the last iterator
+                // was processed to its end.
+                frame->async_complete();
             }
             catch (async_traversal_detached_exception const&)
             {
-                return false;
+                // Do nothing here since the exception was just meant
+                // for terminating the control flow.
             }
         }
         /// Reenter an asynchronous iterator pack and continue its traversal.
         template <typename Frame, typename Current, typename Next,
             typename... Hierarchy>
-        bool resume_traversal(Frame&& frame, Current&& current, Next&& next,
+        void resume_traversal(Frame&& frame, Current&& current, Next&& next,
             Hierarchy&&... hierarchy)
         {
+            traversal_point_of_t<Frame, Next, Hierarchy...> point(
+                std::forward<Frame>(frame), std::forward<Next>(next),
+                std::forward<Hierarchy>(hierarchy)...);
+
             try
             {
-                /// TODO Resolve the recursion here
-                async_traverse(std::forward<Current>(current),
-                    util::forward_as_tuple(std::forward<Next>(next),
-                        std::forward<Hierarchy>(hierarchy)...));
-                return reenter(std::forward<Next>(next).shift(),
+                point.async_traverse(std::forward<Current>(current));
+                resume_traversal(std::forward<Next>(next).shift(),
                     std::forward<Hierarchy>(hierarchy)...);
             }
             catch (async_traversal_detached_exception const&)
             {
-                return false;
+                // Do nothing here since the exception was just meant
+                // for terminating the control flow.
             }
         }
 
@@ -280,7 +302,7 @@ namespace util {
             // Create the frame on the heap which stores the arguments
             // to traverse asynchronous.
             auto frame = std::make_shared<FrameType>(
-                std::forward<Mapper>(mapper), std::forward<T>(pack));
+                std::forward<Mapper>(mapper), std::forward<T>(pack)...);
 
             // Create a static range for the top level tuple
             auto range = begin_static_range(frame->head());
