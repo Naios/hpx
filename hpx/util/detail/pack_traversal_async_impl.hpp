@@ -35,6 +35,42 @@ namespace util {
         using explicit_range_sequence_of_t = typename relocate_index_pack<Begin,
             typename make_index_pack<End - Begin>::type>::type;
 
+        /// Continues the traversal when the object is called
+        template <typename Frame, typename State>
+        class resume_traversal_callable
+        {
+            Frame frame_;
+            State state_;
+
+        public:
+            explicit resume_traversal_callable(Frame frame, State state)
+              : frame_(std::move(frame))
+              , state_(std::move(state))
+            {
+            }
+
+            /// The callable operator for resuming
+            /// the asynchronous pack traversal
+            void operator()();
+        };
+
+        /// Creates a resume_traversal_callable from the given frame and the
+        /// given iterator tuple.
+        template <typename Frame, typename State>
+        auto make_resume_traversal_callable(Frame&& frame, State&& state)
+            -> resume_traversal_callable<typename std::decay<Frame>::type,
+                typename std::decay<State>::type>
+        {
+            return resume_traversal_callable<typename std::decay<Frame>::type,
+                typename std::decay<State>::type>(
+                std::forward<Frame>(frame), std::forward<State>(state));
+        }
+
+        template <typename Frame, typename State>
+        void resume_traversal_callable<Frame, State>::operator()()
+        {
+        }
+
         /// Stores the visitor and the arguments to traverse
         template <typename Visitor, typename... Args>
         class async_traversal_frame
@@ -72,14 +108,18 @@ namespace util {
             template <typename T, typename Hierarchy>
             void async_continue(T&& value, Hierarchy&& hierarchy)
             {
-                // TODO
+                auto resumable =
+                    make_resume_traversal_callable(this->shared_from_this(),
+                        std::forward<Hierarchy>(hierarchy));
+                util::invoke(
+                    visitor_, std::forward<T>(value), std::move(resumable));
             }
 
             /// Calls the visitor with no arguments to signalize that the
             /// asynchrnous traversal was finished.
             void async_complete()
             {
-                // TODO
+                util::invoke(visitor_);
             }
         };
 
@@ -132,23 +172,23 @@ namespace util {
 
         /// Returns a static begin iterator for the given type
         template <typename T>
-        begin_static_range_of_t<T> begin_static_range(T&& element)
+        begin_static_range_of_t<T> make_static_range(T&& element)
         {
             auto pointer = std::addressof(element);
             return begin_static_range_of_t<T>{pointer};
         }
 
         /// Represents a particular point in a asynchronous traversal hierarchy
-        template <typename Frame, typename Hierarchy>
+        template <typename Frame, typename... Hierarchy>
         class async_traversal_point
         {
             Frame frame_;
-            Hierarchy hierarchy_;
+            tuple<Hierarchy...> hierarchy_;
 
         public:
-            explicit async_traversal_point(Frame frame, Hierarchy hierarchy)
+            explicit async_traversal_point(Frame frame, Hierarchy... hierarchy)
               : frame_(std::move(frame))
-              , hierarchy_(std::move(hierarchy))
+              , hierarchy_(std::move(hierarchy)...)
             {
             }
 
@@ -217,7 +257,8 @@ namespace util {
             {
                 using ElementType =
                     typename std::decay<decltype(*current)>::type;
-                return async_match_impl(container_category_of_t<ElementType>{},
+                return async_traverse_one_impl(
+                    container_category_of_t<ElementType>{},
                     std::forward<Current>(current));
             }
 
@@ -305,7 +346,7 @@ namespace util {
                 std::forward<Mapper>(mapper), std::forward<T>(pack)...);
 
             // Create a static range for the top level tuple
-            auto range = begin_static_range(frame->head());
+            auto range = make_static_range(frame->head());
 
             // Start the asynchronous traversal
             resume_traversal(std::move(frame), std::move(range));
