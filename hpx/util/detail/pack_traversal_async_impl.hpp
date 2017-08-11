@@ -126,7 +126,7 @@ namespace util {
             {
             }
 
-            char const* what() const override
+            char const* what() const noexcept override
             {
                 return "The execution context was detached!";
             }
@@ -221,9 +221,9 @@ namespace util {
                 {
                     // Store the current call hierarchy into a tuple for
                     // later reentrance.
-                    auto state = util::tuple_cat(
-                        util::make_tuple(current.next()),
-                        std::move(hierarchy_));
+                    auto state =
+                        util::tuple_cat(util::make_tuple(current.next()),
+                            std::move(hierarchy_));
 
                     // If the traversal method returns false, we detach the
                     // current execution context and call the visitor with the
@@ -244,6 +244,7 @@ namespace util {
                 container_category_tag<false, IsTupleLike>,
                 Current&& current)
             {
+                // TODO
             }
 
             /// Async traverse a single element which is a tuple like type only.
@@ -354,13 +355,13 @@ namespace util {
         template <typename Mapper, typename... T>
         void apply_pack_transform_async(Mapper&& mapper, T&&... pack)
         {
-            using FrameType =
+            using frame_type =
                 async_traversal_frame<typename std::decay<Mapper>::type,
                     typename std::decay<T>::type...>;
 
             // Create the frame on the heap which stores the arguments
             // to traverse asynchronous.
-            auto frame = std::make_shared<FrameType>(
+            auto frame = std::make_shared<frame_type>(
                 std::forward<Mapper>(mapper), std::forward<T>(pack)...);
 
             // Create a static range for the top level tuple
