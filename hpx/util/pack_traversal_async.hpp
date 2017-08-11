@@ -22,6 +22,8 @@ namespace util {
     template <typename Visitor, typename... T>
     void traverse_pack_async(Visitor&& visitor, T&&... pack)
     {
+        detail::apply_pack_transform_async(
+            std::forward<Visitor>(visitor), std::forward<T>(pack)...);
     }
 }    // end namespace util
 }    // end namespace hpx
