@@ -332,7 +332,7 @@ namespace util {
                 try
                 {
                     point.async_traverse(std::forward<Current>(current));
-                    resume_traversal(std::forward<Next>(next).shift(),
+                    resume_traversal(std::forward<Next>(next).next(),
                         std::forward<Hierarchy>(hierarchy)...);
                 }
                 catch (async_traversal_detached_exception const&)
