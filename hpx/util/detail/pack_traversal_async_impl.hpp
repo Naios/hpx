@@ -304,8 +304,9 @@ namespace util {
             {
                 try
                 {
-                    traversal_point_of_t<Frame> point(
-                        std::forward<Frame>(frame));
+                    // Don't forward the frame here, since we still need
+                    // a valid reference for calling it later.
+                    traversal_point_of_t<Frame> point(frame);
 
                     point.async_traverse(std::forward<Current>(current));
 

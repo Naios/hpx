@@ -8,6 +8,8 @@
 #include "hpx/util/lightweight_test.hpp"
 
 #include <functional>
+#include <type_traits>
+#include <utility>
 
 using hpx::lcos::future;
 using hpx::util::traverse_pack_async;
@@ -61,7 +63,7 @@ class async_increasing_int_visitor
     std::reference_wrapper<int> counter_;
 
 public:
-    explicit async_increasing_int_visitor(int& counter)
+    explicit async_increasing_int_visitor(std::reference_wrapper<int> counter)
       : counter_(counter)
     {
     }
@@ -89,7 +91,8 @@ static void test_async_traversal()
 {
     {
         int counter = 0;
-        traverse_pack_async(async_increasing_int_visitor(counter), 0, 1, 2, 3);
+        traverse_pack_async(
+            async_increasing_int_visitor(std::ref(counter)), 0, 1, 2, 3);
         HPX_TEST_EQ(counter, 4);
     }
 }
