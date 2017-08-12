@@ -10,6 +10,7 @@
 #include <hpx/traits/future_traits.hpp>
 #include <hpx/traits/is_future.hpp>
 #include <hpx/traits/is_tuple_like.hpp>
+#include <hpx/util/detail/pack.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/pack_traversal.hpp>
@@ -191,7 +192,7 @@ namespace util {
 
         /// Helper for routing non void result types to the corresponding
         /// callable object.
-        template <std::size_t Depth, typename Result>
+        template <std::size_t Depth, typename MyArgs, typename = void>
         struct invoke_wrapped_decorate_select
         {
             template <typename C, typename... Args>
@@ -205,8 +206,11 @@ namespace util {
                     unwrap_depth_impl<Depth>(std::forward<Args>(args)...));
             }
         };
-        template <std::size_t Depth>
-        struct invoke_wrapped_decorate_select<Depth, void>
+        template <std::size_t Depth, typename... MyArgs>
+        struct invoke_wrapped_decorate_select<Depth,
+            pack<MyArgs...>,
+            typename std::enable_if<std::is_void<decltype(unwrap_depth_impl<
+                Depth>(std::declval<MyArgs>()...))>::value>::type>
         {
             template <typename C, typename... Args>
             static auto apply(C&& callable, Args&&... args)
@@ -220,16 +224,13 @@ namespace util {
         /// map_pack may return a tuple, a plain type or void choose the
         /// corresponding invocation function accordingly.
         template <std::size_t Depth, typename C, typename... Args>
-        auto invoke_wrapped(C&& callable, Args&&... args)
-            -> decltype(invoke_wrapped_decorate_select<Depth,
-                decltype(unwrap_depth_impl<Depth>(std::forward<Args>(
-                    args)...))>::apply(std::forward<C>(callable),
+        auto invoke_wrapped(C&& callable, Args&&... args) -> decltype(
+            invoke_wrapped_decorate_select<Depth, pack<Args...>>::apply(
+                std::forward<C>(callable),
                 std::forward<Args>(args)...))
         {
-            return invoke_wrapped_decorate_select<Depth,
-                decltype(unwrap_depth_impl<Depth>(std::forward<Args>(
-                    args)...))>::apply(std::forward<C>(callable),
-                std::forward<Args>(args)...);
+            return invoke_wrapped_decorate_select<Depth, pack<Args...>>::apply(
+                std::forward<C>(callable), std::forward<Args>(args)...);
         }
 
         /// Implements the callable object which is returned by n invocation
