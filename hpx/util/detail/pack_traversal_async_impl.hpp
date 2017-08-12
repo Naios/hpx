@@ -247,12 +247,16 @@ namespace util {
                 // TODO
             }
 
+            /// Forks the current traversal point and 
+            template <typename Child, typename Ancestor>
+            void fork(Child&& child, Ancestor&& ancestor);
+
             /// Async traverse a single element which is a tuple like type only.
             template <typename Current>
             void async_traverse_one_impl(container_category_tag<true, false>,
                 Current&& current)
             {
-                // TODO
+                make_static_range(*current, std::forward<Current>(current));
             }
 
             /// Async traverse the current iterator
