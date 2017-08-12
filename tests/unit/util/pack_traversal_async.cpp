@@ -10,6 +10,7 @@
 #include <hpx/util/unused.hpp>
 #include "hpx/util/lightweight_test.hpp"
 
+#include <cstdint>
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -18,23 +19,6 @@ using hpx::lcos::future;
 using hpx::util::make_tuple;
 using hpx::util::traverse_pack_async;
 using hpx::util::tuple;
-
-struct async_int_visitor
-{
-    bool operator()(int& i) const
-    {
-        return false;
-    }
-
-    template <typename N>
-    void operator()(int& i, N&& next) const
-    {
-        i = 0;
-        std::forward<N>(next)();
-    }
-
-    void operator()() const {}
-};
 
 struct async_future_visitor
 {
@@ -61,6 +45,7 @@ struct async_future_visitor
     }
 };
 
+template <std::size_t ArgCount>
 class async_increasing_int_sync_visitor
 {
     std::reference_wrapper<int> counter_;
@@ -91,10 +76,11 @@ public:
 
     void operator()() const
     {
-        HPX_TEST_EQ(counter_.get(), 4);
+        HPX_TEST_EQ(counter_.get(), ArgCount);
     }
 };
 
+template <std::size_t ArgCount>
 class async_increasing_int_visitor
 {
     std::reference_wrapper<int> counter_;
@@ -122,10 +108,11 @@ public:
 
     void operator()() const
     {
-        HPX_TEST_EQ(counter_.get(), 4);
+        HPX_TEST_EQ(counter_.get(), ArgCount);
     }
 };
 
+template <std::size_t ArgCount>
 class async_increasing_int_interrupted_visitor
 {
     std::reference_wrapper<int> counter_;
@@ -171,8 +158,9 @@ void test_async_traversal_base(Args&&... args)
     // when we detach the control flow on every visit.
     {
         int counter = 0;
-        traverse_pack_async(
-            async_increasing_int_sync_visitor(std::ref(counter)), args...);
+        traverse_pack_async(async_increasing_int_sync_visitor<sizeof...(args)>(
+                                std::ref(counter)),
+            args...);
         HPX_TEST_EQ(counter, sizeof...(args));
     }
 
@@ -181,7 +169,8 @@ void test_async_traversal_base(Args&&... args)
     {
         int counter = 0;
         traverse_pack_async(
-            async_increasing_int_visitor(std::ref(counter)), args...);
+            async_increasing_int_visitor<sizeof...(args)>(std::ref(counter)),
+            args...);
         HPX_TEST_EQ(counter, sizeof...(args));
     }
 
@@ -190,7 +179,8 @@ void test_async_traversal_base(Args&&... args)
     {
         int counter = 0;
         traverse_pack_async(
-            async_increasing_int_interrupted_visitor(std::ref(counter)),
+            async_increasing_int_interrupted_visitor<sizeof...(args)>(
+                std::ref(counter)),
             args...);
         HPX_TEST_EQ(counter, 2);
     }
