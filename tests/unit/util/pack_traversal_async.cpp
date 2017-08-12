@@ -6,6 +6,7 @@
 #include <hpx/config.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/util/pack_traversal_async.hpp>
+#include <hpx/util/tuple.hpp>
 #include <hpx/util/unused.hpp>
 #include "hpx/util/lightweight_test.hpp"
 
@@ -14,7 +15,9 @@
 #include <utility>
 
 using hpx::lcos::future;
+using hpx::util::make_tuple;
 using hpx::util::traverse_pack_async;
+using hpx::util::tuple;
 
 struct async_int_visitor
 {
@@ -30,9 +33,7 @@ struct async_int_visitor
         std::forward<N>(next)();
     }
 
-    void operator()() const
-    {
-    }
+    void operator()() const {}
 };
 
 struct async_future_visitor
@@ -65,8 +66,8 @@ class async_increasing_int_sync_visitor
     std::reference_wrapper<int> counter_;
 
 public:
-    explicit async_increasing_int_sync_visitor(
-        std::reference_wrapper<int> counter)
+    explicit async_increasing_int_sync_visitor(std::reference_wrapper<int>
+            counter)
       : counter_(counter)
     {
     }
@@ -131,7 +132,8 @@ class async_increasing_int_interrupted_visitor
 
 public:
     explicit async_increasing_int_interrupted_visitor(
-        std::reference_wrapper<int> counter)
+        std::reference_wrapper<int>
+            counter)
       : counter_(counter)
     {
     }
@@ -162,15 +164,16 @@ public:
     }
 };
 
-static void test_async_traversal()
+template <typename... Args>
+void test_async_traversal_base(Args&&... args)
 {
     // Test that every element is traversed in the correct order
     // when we detach the control flow on every visit.
     {
         int counter = 0;
         traverse_pack_async(
-            async_increasing_int_sync_visitor(std::ref(counter)), 0, 1, 2, 3);
-        HPX_TEST_EQ(counter, 4);
+            async_increasing_int_sync_visitor(std::ref(counter)), args...);
+        HPX_TEST_EQ(counter, sizeof...(args));
     }
 
     // Test that every element is traversed in the correct order
@@ -178,8 +181,8 @@ static void test_async_traversal()
     {
         int counter = 0;
         traverse_pack_async(
-            async_increasing_int_visitor(std::ref(counter)), 0, 1, 2, 3);
-        HPX_TEST_EQ(counter, 4);
+            async_increasing_int_visitor(std::ref(counter)), args...);
+        HPX_TEST_EQ(counter, sizeof...(args));
     }
 
     // Test that the first element is traversed only,
@@ -187,15 +190,32 @@ static void test_async_traversal()
     {
         int counter = 0;
         traverse_pack_async(
-            async_increasing_int_interrupted_visitor(std::ref(counter)), 0, 1,
-            2, 3);
+            async_increasing_int_interrupted_visitor(std::ref(counter)),
+            args...);
         HPX_TEST_EQ(counter, 2);
     }
+}
+
+static void test_async_traversal()
+{
+    // Just test everything using a casual int pack
+    test_async_traversal_base(0, 1, 2, 3);
+}
+
+static void test_async_tuple_like_traversal()
+{
+    // Test by passing a tuple in the middle
+    test_async_traversal_base(0, make_tuple(1, 2), 3);
+    // Test by splitting the pack in two tuples
+    test_async_traversal_base(make_tuple(0, 1), make_tuple(2, 3));
+    // Test by passing a huge tuple to the traversal
+    test_async_traversal_base(make_tuple(0, 1, 2, 3));
 }
 
 int main(int, char**)
 {
     test_async_traversal();
+    test_async_tuple_like_traversal();
 
     return hpx::util::report_errors();
 }
