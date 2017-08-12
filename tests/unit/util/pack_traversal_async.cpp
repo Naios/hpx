@@ -58,6 +58,37 @@ struct async_future_visitor
     }
 };
 
+class async_increasing_int_sync_visitor
+{
+    std::reference_wrapper<int> counter_;
+
+public:
+    explicit async_increasing_int_sync_visitor(
+        std::reference_wrapper<int> counter)
+      : counter_(counter)
+    {
+    }
+
+    bool operator()(int i) const
+    {
+        HPX_TEST_EQ(i, counter_.get());
+        ++counter_.get();
+        return true;
+    }
+
+    template <typename N>
+    void operator()(int i, N&& next)
+    {
+        // Should never be called!
+        HPX_TEST(false);
+    }
+
+    void operator()() const
+    {
+        HPX_TEST_EQ(counter_.get(), 4);
+    }
+};
+
 class async_increasing_int_visitor
 {
     std::reference_wrapper<int> counter_;
@@ -87,13 +118,70 @@ public:
     }
 };
 
+class async_increasing_int_interrupted_visitor
+{
+    std::reference_wrapper<int> counter_;
+
+public:
+    explicit async_increasing_int_interrupted_visitor(
+        std::reference_wrapper<int> counter)
+      : counter_(counter)
+    {
+    }
+
+    bool operator()(int i) const
+    {
+        HPX_TEST_EQ(i, counter_.get());
+        ++counter_.get();
+
+        // Detach the control flow at the second step
+        return i == 0;
+    }
+
+    template <typename N>
+    void operator()(int i, N&& next)
+    {
+        HPX_TEST_EQ(i, 1);
+        HPX_TEST_EQ(counter_.get(), 2);
+
+        // Don't call next here
+    }
+
+    void operator()() const
+    {
+        // Will never be called
+        HPX_TEST(false);
+    }
+};
+
 static void test_async_traversal()
 {
+    // Test that every element is traversed in the correct order
+    // when we detach the control flow on every visit.
+    {
+        int counter = 0;
+        traverse_pack_async(
+            async_increasing_int_sync_visitor(std::ref(counter)), 0, 1, 2, 3);
+        HPX_TEST_EQ(counter, 4);
+    }
+
+    // Test that every element is traversed in the correct order
+    // when we detach the control flow on every visit.
     {
         int counter = 0;
         traverse_pack_async(
             async_increasing_int_visitor(std::ref(counter)), 0, 1, 2, 3);
         HPX_TEST_EQ(counter, 4);
+    }
+
+    // Test that the first element is traversed only,
+    // if we don't call the resume continuation.
+    {
+        int counter = 0;
+        traverse_pack_async(
+            async_increasing_int_interrupted_visitor(std::ref(counter)), 0, 1,
+            2, 3);
+        HPX_TEST_EQ(counter, 2);
     }
 }
 
