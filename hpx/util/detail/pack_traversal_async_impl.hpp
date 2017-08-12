@@ -122,9 +122,7 @@ namespace util {
         /// An internally used exception to detach the current execution context
         struct async_traversal_detached_exception : std::exception
         {
-            explicit async_traversal_detached_exception()
-            {
-            }
+            explicit async_traversal_detached_exception() {}
 
             char const* what() const noexcept override
             {
@@ -161,9 +159,7 @@ namespace util {
         template <typename Target, std::size_t Begin>
         struct static_async_range<Target, Begin, Begin>
         {
-            explicit static_async_range(Target*)
-            {
-            }
+            explicit static_async_range(Target*) {}
         };
 
         /// Deduces to the static range type for the given type
@@ -180,6 +176,19 @@ namespace util {
             return begin_static_range_of_t<T>{pointer};
         }
 
+        /// A callable object which is cabale of resuming an asynchronous
+        /// pack traversal.
+        struct resume_state_callable
+        {
+            template <typename Frame, typename Current>
+            void operator()(Frame&& frame, Current&& current) const;
+
+            template <typename Frame, typename Current, typename Next,
+                typename... Hierarchy>
+            void operator()(Frame&& frame, Current&& current, Next&& next,
+                Hierarchy&&... hierarchy) const;
+        };
+
         /// Represents a particular point in a asynchronous traversal hierarchy
         template <typename Frame, typename... Hierarchy>
         class async_traversal_point
@@ -192,6 +201,23 @@ namespace util {
               : frame_(std::move(frame))
               , hierarchy_(std::move(hierarchy)...)
             {
+            }
+
+            /// Forks the current traversal point and continues the child
+            /// of the given parent.
+            template <typename Child, typename Parent>
+            void fork(Child&& child, Parent&& parent)
+            {
+                // Create a new hierarchy which contains the 
+                // child (the current traversed element) and
+                // the parent (the last traversed element).
+                auto hierarchy = util::tuple_cat(
+                    util::make_tuple(frame_, std::forward<Child>(child),
+                        std::forward<Parent>(parent)),
+                    hierarchy_);
+
+                util::invoke_fused(
+                    resume_state_callable{}, std::move(hierarchy));
             }
 
             /// Async traverse a single element, and do nothing.
@@ -247,16 +273,13 @@ namespace util {
                 // TODO
             }
 
-            /// Forks the current traversal point and 
-            template <typename Child, typename Ancestor>
-            void fork(Child&& child, Ancestor&& ancestor);
-
             /// Async traverse a single element which is a tuple like type only.
             template <typename Current>
             void async_traverse_one_impl(container_category_tag<true, false>,
                 Current&& current)
             {
-                make_static_range(*current, std::forward<Current>(current));
+                fork(make_static_range(*current),
+                    std::forward<Current>(current));
             }
 
             /// Async traverse the current iterator
@@ -297,63 +320,60 @@ namespace util {
             async_traversal_point<typename std::decay<Frame>::type,
                 typename std::decay<Hierarchy>::type...>;
 
-        /// A callable object which is cabale of resuming an asynchronous
-        /// pack traversal.
-        struct resume_state_callable
+        /// Reenter an asynchronous iterator pack and continue
+        /// its traversal.
+        template <typename Frame, typename Current>
+        void resume_state_callable::operator()(
+            Frame&& frame, Current&& current) const
         {
-            /// Reenter an asynchronous iterator pack and continue
-            /// its traversal.
-            template <typename Frame, typename Current>
-            void operator()(Frame&& frame, Current&& current) const
+            try
             {
-                try
-                {
-                    // Don't forward the frame here, since we still need
-                    // a valid reference for calling it later.
-                    traversal_point_of_t<Frame> point(frame);
+                // Don't forward the frame here, since we still need
+                // a valid reference for calling it later.
+                traversal_point_of_t<Frame> point(frame);
 
-                    point.async_traverse(std::forward<Current>(current));
+                point.async_traverse(std::forward<Current>(current));
 
-                    // Complete the asynchrnous traversal when the last iterator
-                    // was processed to its end.
-                    frame->async_complete();
-                }
-                catch (async_traversal_detached_exception const&)
-                {
-                    // Do nothing here since the exception was just meant
-                    // for terminating the control flow.
-                }
+                // Complete the asynchrnous traversal when the last iterator
+                // was processed to its end.
+                frame->async_complete();
             }
-            /// Reenter an asynchronous iterator pack and continue its traversal.
-            template <typename Frame, typename Current, typename Next,
-                typename... Hierarchy>
-            void operator()(Frame&& frame, Current&& current, Next&& next,
-                Hierarchy&&... hierarchy) const
+            catch (async_traversal_detached_exception const&)
             {
-                traversal_point_of_t<Frame, Next, Hierarchy...> point(
-                    std::forward<Frame>(frame), std::forward<Next>(next),
+                // Do nothing here since the exception was just meant
+                // for terminating the control flow.
+            }
+        }
+
+        /// Reenter an asynchronous iterator pack and continue its traversal.
+        template <typename Frame, typename Current, typename Next,
+            typename... Hierarchy>
+        void resume_state_callable::operator()(Frame&& frame, Current&& current,
+            Next&& next, Hierarchy&&... hierarchy) const
+        {
+            traversal_point_of_t<Frame, Next, Hierarchy...> point(
+                std::forward<Frame>(frame), std::forward<Next>(next),
+                std::forward<Hierarchy>(hierarchy)...);
+
+            try
+            {
+                point.async_traverse(std::forward<Current>(current));
+                resume_traversal(std::forward<Next>(next).next(),
                     std::forward<Hierarchy>(hierarchy)...);
-
-                try
-                {
-                    point.async_traverse(std::forward<Current>(current));
-                    resume_traversal(std::forward<Next>(next).next(),
-                        std::forward<Hierarchy>(hierarchy)...);
-                }
-                catch (async_traversal_detached_exception const&)
-                {
-                    // Do nothing here since the exception was just meant
-                    // for terminating the control flow.
-                }
             }
-        };
+            catch (async_traversal_detached_exception const&)
+            {
+                // Do nothing here since the exception was just meant
+                // for terminating the control flow.
+            }
+        }
 
         template <typename Frame, typename State>
         void resume_traversal_callable<Frame, State>::operator()()
         {
-            auto all = util::tuple_cat(
+            auto hierarchy = util::tuple_cat(
                 util::make_tuple(std::move(frame_)), std::move(state_));
-            util::invoke_fused(resume_state_callable{}, std::move(all));
+            util::invoke_fused(resume_state_callable{}, std::move(hierarchy));
         }
 
         /// Traverses the given pack with the given mapper
