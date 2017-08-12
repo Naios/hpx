@@ -208,7 +208,7 @@ namespace util {
             template <typename Child, typename Parent>
             void fork(Child&& child, Parent&& parent)
             {
-                // Create a new hierarchy which contains the 
+                // Create a new hierarchy which contains the
                 // child (the current traversed element) and
                 // the parent (the last traversed element).
                 auto hierarchy = util::tuple_cat(
@@ -267,7 +267,7 @@ namespace util {
             /// tuple like type.
             template <bool IsTupleLike, typename Current>
             void async_traverse_one_impl(
-                container_category_tag<false, IsTupleLike>,
+                container_category_tag<true, IsTupleLike>,
                 Current&& current)
             {
                 // TODO
@@ -275,7 +275,7 @@ namespace util {
 
             /// Async traverse a single element which is a tuple like type only.
             template <typename Current>
-            void async_traverse_one_impl(container_category_tag<true, false>,
+            void async_traverse_one_impl(container_category_tag<false, true>,
                 Current&& current)
             {
                 fork(make_static_range(*current),
@@ -326,13 +326,19 @@ namespace util {
         void resume_state_callable::operator()(
             Frame&& frame, Current&& current) const
         {
+            HPX_ASSERT(frame);
+
             try
             {
                 // Don't forward the frame here, since we still need
                 // a valid reference for calling it later.
                 traversal_point_of_t<Frame> point(frame);
 
+                HPX_ASSERT(frame);
+
                 point.async_traverse(std::forward<Current>(current));
+
+                HPX_ASSERT(frame);
 
                 // Complete the asynchrnous traversal when the last iterator
                 // was processed to its end.
@@ -351,14 +357,16 @@ namespace util {
         void resume_state_callable::operator()(Frame&& frame, Current&& current,
             Next&& next, Hierarchy&&... hierarchy) const
         {
+            // Don't forward the arguments here, since we still need
+            // the objects in a valid state later.
             traversal_point_of_t<Frame, Next, Hierarchy...> point(
-                std::forward<Frame>(frame), std::forward<Next>(next),
-                std::forward<Hierarchy>(hierarchy)...);
+                frame, next, hierarchy...);
 
             try
             {
                 point.async_traverse(std::forward<Current>(current));
-                resume_traversal(std::forward<Next>(next).next(),
+                (*this)(std::forward<Frame>(frame),
+                    std::forward<Next>(next).next(),
                     std::forward<Hierarchy>(hierarchy)...);
             }
             catch (async_traversal_detached_exception const&)
