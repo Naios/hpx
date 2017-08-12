@@ -3,8 +3,10 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+#include <hpx/config.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/util/pack_traversal_async.hpp>
+#include <hpx/util/unused.hpp>
 #include "hpx/util/lightweight_test.hpp"
 
 #include <functional>
@@ -79,6 +81,9 @@ public:
     template <typename N>
     void operator()(int i, N&& next)
     {
+        HPX_UNUSED(i);
+        HPX_UNUSED(next);
+
         // Should never be called!
         HPX_TEST(false);
     }
@@ -108,6 +113,8 @@ public:
     template <typename N>
     void operator()(int i, N&& next)
     {
+        HPX_UNUSED(i);
+
         ++counter_.get();
         std::forward<N>(next)();
     }
@@ -145,6 +152,7 @@ public:
         HPX_TEST_EQ(counter_.get(), 2);
 
         // Don't call next here
+        HPX_UNUSED(next);
     }
 
     void operator()() const
