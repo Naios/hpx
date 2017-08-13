@@ -190,16 +190,6 @@ namespace util {
             Begin begin_;
             Sentinel sentinel_;
 
-            Begin const& begin() const noexcept
-            {
-                return begin_;
-            }
-
-            Sentinel const& end() const noexcept
-            {
-                return sentinel_;
-            }
-
             dynamic_async_range& operator++() noexcept
             {
                 ++begin_;
@@ -214,7 +204,7 @@ namespace util {
 
             dynamic_async_range next() const
             {
-                dynamic_async_range other;
+                dynamic_async_range other = *this;
                 ++other;
                 return other;
             }
@@ -234,10 +224,6 @@ namespace util {
         template <typename T, typename Range = dynamic_async_range_of_t<T>>
         Range make_dynamic_async_range(T&& element)
         {
-            auto size = element.size();
-            auto begin = std::begin(element);
-            auto end = std::end(element);
-            auto myend = element.end();
             return Range{std::begin(element), std::end(element)};
         }
 
@@ -333,9 +319,6 @@ namespace util {
                 container_category_tag<true, IsTupleLike>,
                 Current&& current)
             {
-                auto const& element = *current;
-                auto newRange = make_dynamic_async_range(*current);
-
                 fork(make_dynamic_async_range(*current),
                     std::forward<Current>(current));
             }

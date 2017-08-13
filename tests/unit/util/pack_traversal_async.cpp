@@ -12,9 +12,15 @@
 
 #include <cstdint>
 #include <functional>
+#include <list>
+#include <set>
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#if defined(HPX_HAVE_CXX11_STD_ARRAY)
+#include <array>
+#endif
 
 using hpx::lcos::future;
 using hpx::util::make_tuple;
@@ -89,8 +95,8 @@ class async_increasing_int_visitor
     std::reference_wrapper<std::size_t> counter_;
 
 public:
-    explicit async_increasing_int_visitor(
-        std::reference_wrapper<std::size_t> counter)
+    explicit async_increasing_int_visitor(std::reference_wrapper<std::size_t>
+            counter)
       : counter_(counter)
     {
     }
@@ -195,16 +201,62 @@ static void test_async_traversal()
     test_async_traversal_base<4U>(0U, 1U, 2U, 3U);
 }
 
+template <typename ContainerFactory>
+void test_async_container_traversal_impl(ContainerFactory&& container_of)
+{
+    // Test by passing a containers in the middle
+    test_async_traversal_base<4U>(0U, container_of(1U, 2U), 3U);
+    // Test by splitting the pack in two containers
+    test_async_traversal_base<4U>(container_of(0U, 1U), container_of(2U, 3U));
+    // Test by passing a huge containers to the traversal
+    test_async_traversal_base<4U>(container_of(0U, 1U, 2U, 3U));
+}
+
+template <typename T>
+struct common_container_factory
+{
+    template <typename... Args>
+    T operator()(Args&&... args)
+    {
+        return T{std::forward<Args>(args)...};
+    }
+};
+
+#if defined(HPX_HAVE_CXX11_STD_ARRAY)
+template <typename T>
+struct array_container_factory
+{
+    template <typename... Args, typename Array = std::array<T, sizeof...(Args)>>
+    Array operator()(Args&&... args)
+    {
+        return Array{{std::forward<Args>(args)...}};
+    }
+};
+#endif
+
 static void test_async_container_traversal()
 {
-    using container = std::vector<std::size_t>;
+    {
+        common_container_factory<std::vector<std::size_t>> factory;
+        test_async_container_traversal_impl(factory);
+    }
 
-    // Test by passing a containers in the middle
-    test_async_traversal_base<4U>(0U, container{1U, 2U}, 3U);
-    // Test by splitting the pack in two containers
-    test_async_traversal_base<4U>(container{0U, 1U}, container{2U, 3U});
-    // Test by passing a huge containers to the traversal
-    test_async_traversal_base<4U>(container{0U, 1U, 2U, 3U});
+    {
+        common_container_factory<std::list<std::size_t>> factory;
+        test_async_container_traversal_impl(factory);
+    }
+
+    {
+        common_container_factory<std::set<std::size_t>> factory;
+        test_async_container_traversal_impl(factory);
+    }
+
+#if defined(HPX_HAVE_CXX11_STD_ARRAY)
+    {
+        array_container_factory<std::size_t> factory;
+        test_async_container_traversal_impl(factory);
+    }
+#endif
 }
 
 static void test_async_tuple_like_traversal()
@@ -217,19 +269,36 @@ static void test_async_tuple_like_traversal()
     test_async_traversal_base<4U>(make_tuple(0U, 1U, 2U, 3U));
 }
 
+template <typename T,
+    typename... Args,
+    typename Vector = std::vector<typename std::decay<T>::type>>
+Vector vector_of(T&& first, Args&&... args)
+{
+    return Vector{std::forward<T>(first), std::forward<Args>(args)...};
+}
+
+static void test_async_mixed_traversal()
+{
+    using container_t = std::vector<std::size_t>;
+
+    // Test hierarchies where container and tuple like types are mixed
+    test_async_traversal_base<4U>(
+        0U, hpx::util::make_tuple(container_t{1U, 2U}), 3U);
+
+    test_async_traversal_base<4U>(
+        hpx::util::make_tuple(0U, vector_of(vector_of(1U))),
+        make_tuple(2U, 3U));
+
+    test_async_traversal_base<4U>(
+        vector_of(vector_of(make_tuple(0U, 1U, 2U, 3U))));
+}
+
 int main(int, char**)
 {
     test_async_traversal();
     test_async_container_traversal();
     test_async_tuple_like_traversal();
-
-    {
-        std::size_t counter = 0U;
-        traverse_pack_async(
-            async_increasing_int_interrupted_visitor<4>(std::ref(counter)), 0U,
-            make_tuple(1U, 2U), 3U);
-        HPX_TEST_EQ(counter, 2U);
-    }
+    test_async_mixed_traversal();
 
     return hpx::util::report_errors();
 }
