@@ -212,7 +212,7 @@ int main(int, char**)
     {
         int counter = 0;
         traverse_pack_async(async_increasing_int_visitor<4>(std::ref(counter)),
-            make_tuple(0, 1, 2, 3));
+            0, 1, make_tuple(2, 3));
         HPX_TEST_EQ(counter, 5);
     }
 

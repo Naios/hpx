@@ -336,28 +336,20 @@ namespace util {
         void resume_state_callable::operator()(
             Frame&& frame, Current&& current) const
         {
-            try
+            // Only process the next element if the current iterator
+            // hasn't reached its end.
+            if (!current.is_finished())
             {
-                // Only process the next element if the current iterator
-                // hasn't reached its end.
-                if (!current.is_finished())
-                {
-                    // Don't forward the frame here, since we still need
-                    // a valid reference for calling it later.
-                    traversal_point_of_t<Frame> point(frame);
+                // Don't forward the frame here, since we still need
+                // a valid reference for calling it later.
+                traversal_point_of_t<Frame> point(frame);
 
-                    point.async_traverse(std::forward<Current>(current));
-                }
+                point.async_traverse(std::forward<Current>(current));
+            }
 
-                // Complete the asynchrnous traversal when the last iterator
-                // was processed to its end.
-                frame->async_complete();
-            }
-            catch (async_traversal_detached_exception const&)
-            {
-                // Do nothing here since the exception was just meant
-                // for terminating the control flow.
-            }
+            // Complete the asynchrnous traversal when the last iterator
+            // was processed to its end.
+            frame->async_complete();
         }
 
         /// Reenter an asynchronous iterator pack and continue its traversal.
@@ -366,37 +358,38 @@ namespace util {
         void resume_state_callable::operator()(Frame&& frame, Current&& current,
             Next&& next, Hierarchy&&... hierarchy) const
         {
+            // Only process the next element if the current iterator
+            // hasn't reached its end.
+            if (!current.is_finished())
+            {
+                // Don't forward the arguments here, since we still need
+                // the objects in a valid state later.
+                traversal_point_of_t<Frame, Next, Hierarchy...> point(
+                    frame, next, hierarchy...);
+
+                point.async_traverse(std::forward<Current>(current));
+            }
+
+            (*this)(std::forward<Frame>(frame),
+                std::forward<Next>(next).next(),
+                std::forward<Hierarchy>(hierarchy)...);
+        }
+
+        template <typename Frame, typename State>
+        void resume_traversal_callable<Frame, State>::operator()()
+        {
             try
             {
-                // Only process the next element if the current iterator
-                // hasn't reached its end.
-                if (!current.is_finished())
-                {
-                    // Don't forward the arguments here, since we still need
-                    // the objects in a valid state later.
-                    traversal_point_of_t<Frame, Next, Hierarchy...> point(
-                        frame, next, hierarchy...);
-
-                    point.async_traverse(std::forward<Current>(current));
-                }
-
-                (*this)(std::forward<Frame>(frame),
-                    std::forward<Next>(next).next(),
-                    std::forward<Hierarchy>(hierarchy)...);
+                auto hierarchy = util::tuple_cat(
+                    util::make_tuple(std::move(frame_)), std::move(state_));
+                util::invoke_fused(
+                    resume_state_callable{}, std::move(hierarchy));
             }
             catch (async_traversal_detached_exception const&)
             {
                 // Do nothing here since the exception was just meant
                 // for terminating the control flow.
             }
-        }
-
-        template <typename Frame, typename State>
-        void resume_traversal_callable<Frame, State>::operator()()
-        {
-            auto hierarchy = util::tuple_cat(
-                util::make_tuple(std::move(frame_)), std::move(state_));
-            util::invoke_fused(resume_state_callable{}, std::move(hierarchy));
         }
 
         /// Traverses the given pack with the given mapper
@@ -415,8 +408,11 @@ namespace util {
             // Create a static range for the top level tuple
             auto range = make_static_range(frame->head());
 
+            auto resumer = make_resume_traversal_callable(
+                std::move(frame), util::make_tuple(std::move(range)));
+
             // Start the asynchronous traversal
-            resume_state_callable{}(std::move(frame), std::move(range));
+            resumer();
         }
     }    // end namespace detail
 }    // end namespace util
