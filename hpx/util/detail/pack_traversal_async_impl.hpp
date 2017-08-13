@@ -222,8 +222,7 @@ namespace util {
                 // Create a new hierarchy which contains the
                 // the parent (the last traversed element).
                 auto hierarchy = util::tuple_cat(
-                    util::make_tuple(frame_, std::forward<Parent>(parent)),
-                    hierarchy_);
+                    util::make_tuple(std::forward<Parent>(parent)), hierarchy_);
 
                 return async_traversal_point<Frame,
                     typename std::decay<Parent>::type, Hierarchy...>(
