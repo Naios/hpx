@@ -155,17 +155,17 @@ public:
     }
 };
 
-template <typename... Args>
+template <std::size_t ArgCount, typename... Args>
 void test_async_traversal_base(Args&&... args)
 {
     // Test that every element is traversed in the correct order
     // when we detach the control flow on every visit.
     {
         std::size_t counter = 0U;
-        traverse_pack_async(async_increasing_int_sync_visitor<sizeof...(args)>(
-                                std::ref(counter)),
+        traverse_pack_async(
+            async_increasing_int_sync_visitor<ArgCount>(std::ref(counter)),
             args...);
-        HPX_TEST_EQ(counter, sizeof...(args) + 1U);
+        HPX_TEST_EQ(counter, ArgCount + 1U);
     }
 
     // Test that every element is traversed in the correct order
@@ -173,18 +173,16 @@ void test_async_traversal_base(Args&&... args)
     {
         std::size_t counter = 0U;
         traverse_pack_async(
-            async_increasing_int_visitor<sizeof...(args)>(std::ref(counter)),
-            args...);
-        HPX_TEST_EQ(counter, sizeof...(args) + 1U);
+            async_increasing_int_visitor<ArgCount>(std::ref(counter)), args...);
+        HPX_TEST_EQ(counter, ArgCount + 1U);
     }
 
     // Test that the first element is traversed only,
     // if we don't call the resume continuation.
     {
         std::size_t counter = 0U;
-        traverse_pack_async(
-            async_increasing_int_interrupted_visitor<sizeof...(args)>(
-                std::ref(counter)),
+        traverse_pack_async(async_increasing_int_interrupted_visitor<ArgCount>(
+                                std::ref(counter)),
             args...);
         HPX_TEST_EQ(counter, 2U);
     }
@@ -193,22 +191,22 @@ void test_async_traversal_base(Args&&... args)
 static void test_async_traversal()
 {
     // Just test everything using a casual int pack
-    test_async_traversal_base(0U, 1U, 2U, 3U);
+    test_async_traversal_base<4U>(0U, 1U, 2U, 3U);
 }
 
 static void test_async_tuple_like_traversal()
 {
     // Test by passing a tuple in the middle
-    test_async_traversal_base(0U, make_tuple(1U, 2U), 3U);
+    test_async_traversal_base<4U>(0U, make_tuple(1U, 2U), 3U);
     // Test by splitting the pack in two tuples
-    test_async_traversal_base(make_tuple(0U, 1U), make_tuple(2U, 3U));
+    test_async_traversal_base<4U>(make_tuple(0U, 1U), make_tuple(2U, 3U));
     // Test by passing a huge tuple to the traversal
-    test_async_traversal_base(make_tuple(0U, 1U, 2U, 3U));
+    test_async_traversal_base<4U>(make_tuple(0U, 1U, 2U, 3U));
 }
 
 int main(int, char**)
 {
-    // test_async_traversal();
+    test_async_traversal();
     test_async_tuple_like_traversal();
 
     {
