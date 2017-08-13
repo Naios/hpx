@@ -11,6 +11,7 @@ set(tests
     config_entry
     function
     pack_traversal
+    pack_traversal_async
     parse_slurm_nodelist
     range
     tagged
