@@ -354,7 +354,7 @@ namespace util {
             /// its traversal.
             template <typename Frame, typename Current, typename Parent,
                 typename... Hierarchy>
-            void resume_state_callable::operator()(Frame&& frame,
+            void operator()(Frame&& frame,
                 Current&& current, Parent&& parent,
                 Hierarchy&&... hierarchy) const
             {
