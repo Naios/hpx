@@ -34,6 +34,7 @@ enum counter_type
 
 namespace detail
 {
+void test_failed_debugger_break();
 
 struct fixture
 {
@@ -61,6 +62,8 @@ struct fixture
 
     void increment(counter_type c)
     {
+        test_failed_debugger_break();
+
         switch (c)
         {
             case counter_sanity:
