@@ -209,14 +209,14 @@ static void test_async_tuple_like_traversal()
 int main(int, char**)
 {
     // test_async_traversal();
-    // test_async_tuple_like_traversal();
+    test_async_tuple_like_traversal();
 
     {
         std::size_t counter = 0U;
         traverse_pack_async(
-            async_increasing_int_sync_visitor<4>(std::ref(counter)), 0U,
+            async_increasing_int_interrupted_visitor<4>(std::ref(counter)), 0U,
             make_tuple(1U, 2U), 3U);
-        HPX_TEST_EQ(counter, 5U);
+        HPX_TEST_EQ(counter, 2U);
     }
 
     return hpx::util::report_errors();

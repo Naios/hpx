@@ -341,10 +341,8 @@ namespace util {
                 // hasn't reached its end.
                 if (!current.is_finished())
                 {
-                    // Don't forward the frame here, since we still need
-                    // a valid reference for calling it later.
                     traversal_point_of_t<Frame> point(
-                        frame, util::make_tuple());
+                        std::forward<Frame>(frame), util::make_tuple());
 
                     point.async_traverse(std::forward<Current>(current));
                 }
@@ -354,8 +352,7 @@ namespace util {
             /// its traversal.
             template <typename Frame, typename Current, typename Parent,
                 typename... Hierarchy>
-            void operator()(Frame&& frame,
-                Current&& current, Parent&& parent,
+            void operator()(Frame&& frame, Current&& current, Parent&& parent,
                 Hierarchy&&... hierarchy) const
             {
                 // Only process element if the current iterator
