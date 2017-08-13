@@ -186,19 +186,6 @@ namespace util {
             return begin_static_range_of_t<T>{pointer};
         }
 
-        /// A callable object which is cabale of resuming an asynchronous
-        /// pack traversal.
-        struct resume_state_callable
-        {
-            template <typename Frame, typename Current>
-            void operator()(Frame&& frame, Current&& current) const;
-
-            template <typename Frame, typename Current, typename Next,
-                typename... Hierarchy>
-            void operator()(Frame&& frame, Current&& current, Next&& next,
-                Hierarchy&&... hierarchy) const;
-        };
-
         /// Represents a particular point in a asynchronous traversal hierarchy
         template <typename Frame, typename... Hierarchy>
         class async_traversal_point
@@ -264,8 +251,6 @@ namespace util {
                 -> typename always_void<decltype(
                     std::declval<Frame>()->traverse(*current))>::type
             {
-                auto&& val = *current;
-
                 if (!frame_->traverse(*current))
                 {
                     // Store the current call hierarchy into a tuple for
@@ -343,48 +328,55 @@ namespace util {
             async_traversal_point<typename std::decay<Frame>::type,
                 typename std::decay<Hierarchy>::type...>;
 
-        /// Reenter an asynchronous iterator pack and continue
-        /// its traversal.
-        template <typename Frame, typename Current>
-        void resume_state_callable::operator()(
-            Frame&& frame, Current&& current) const
+        /// A callable object which is cabale of resuming an asynchronous
+        /// pack traversal.
+        struct resume_state_callable
         {
-            // Only process the next element if the current iterator
-            // hasn't reached its end.
-            if (!current.is_finished())
+            /// Reenter an asynchronous iterator pack and continue
+            /// its traversal.
+            template <typename Frame, typename Current>
+            void operator()(Frame&& frame, Current&& current) const
             {
-                // Don't forward the frame here, since we still need
-                // a valid reference for calling it later.
-                traversal_point_of_t<Frame> point(frame, util::make_tuple());
+                // Only process the next element if the current iterator
+                // hasn't reached its end.
+                if (!current.is_finished())
+                {
+                    // Don't forward the frame here, since we still need
+                    // a valid reference for calling it later.
+                    traversal_point_of_t<Frame> point(
+                        frame, util::make_tuple());
 
-                point.async_traverse(std::forward<Current>(current));
-            }
-        }
-
-        /// Reenter an asynchronous iterator pack and continue its traversal.
-        template <typename Frame, typename Current, typename Parent,
-            typename... Hierarchy>
-        void resume_state_callable::operator()(Frame&& frame, Current&& current,
-            Parent&& parent, Hierarchy&&... hierarchy) const
-        {
-            // Only process element if the current iterator
-            // hasn't reached its end.
-            if (!current.is_finished())
-            {
-                // Don't forward the arguments here, since we still need
-                // the objects in a valid state later.
-                traversal_point_of_t<Frame, Parent, Hierarchy...> point(
-                    frame, util::make_tuple(parent, hierarchy...));
-
-                point.async_traverse(std::forward<Current>(current));
+                    point.async_traverse(std::forward<Current>(current));
+                }
             }
 
-            // Pop the top element from the hierarchy, and shift the
-            // parent element one to the right
-            (*this)(std::forward<Frame>(frame),
-                std::forward<Parent>(parent).next(),
-                std::forward<Hierarchy>(hierarchy)...);
-        }
+            /// Reenter an asynchronous iterator pack and continue
+            /// its traversal.
+            template <typename Frame, typename Current, typename Parent,
+                typename... Hierarchy>
+            void resume_state_callable::operator()(Frame&& frame,
+                Current&& current, Parent&& parent,
+                Hierarchy&&... hierarchy) const
+            {
+                // Only process element if the current iterator
+                // hasn't reached its end.
+                if (!current.is_finished())
+                {
+                    // Don't forward the arguments here, since we still need
+                    // the objects in a valid state later.
+                    traversal_point_of_t<Frame, Parent, Hierarchy...> point(
+                        frame, util::make_tuple(parent, hierarchy...));
+
+                    point.async_traverse(std::forward<Current>(current));
+                }
+
+                // Pop the top element from the hierarchy, and shift the
+                // parent element one to the right
+                (*this)(std::forward<Frame>(frame),
+                    std::forward<Parent>(parent).next(),
+                    std::forward<Hierarchy>(hierarchy)...);
+            }
+        };
 
         template <typename Frame, typename State>
         void resume_traversal_callable<Frame, State>::operator()()
