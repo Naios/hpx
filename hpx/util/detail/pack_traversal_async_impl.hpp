@@ -174,18 +174,14 @@ namespace util {
             }
         };
 
-        /// Deduces to the static range type for the given type
-        template <typename T>
-        using begin_static_range_of_t =
-            static_async_range<typename std::decay<T>::type, 0U,
-                util::tuple_size<typename std::decay<T>::type>::value>;
-
-        /// Returns a static begin iterator for the given type
-        template <typename T>
-        begin_static_range_of_t<T> make_static_range(T&& element)
+        /// Returns a static range for the given type
+        template <typename T,
+            typename Range = static_async_range<typename std::decay<T>::type,
+                0U, util::tuple_size<typename std::decay<T>::type>::value>>
+        Range make_static_range(T&& element)
         {
             auto pointer = std::addressof(element);
-            return begin_static_range_of_t<T>{pointer};
+            return Range{pointer};
         }
 
         template <typename Begin, typename Sentinel>
@@ -223,38 +219,17 @@ namespace util {
             }
         };
 
-        /// Generic access for a static or dynamic iterator range
-        namespace traversal_iterator_access {
-            template <typename Target, std::size_t Begin, std::size_t End>
-            auto next(static_async_range<Target, Begin, End> range)
-                -> decltype(range.next())
-            {
-                return range.next();
-            }
-
-            template <typename Range>
-            auto next(Range range) -> decltype(
-                util::make_iterator_range(std::begin(range), std::end(range)))
-            {
-                auto begin = std::begin(range);
-                auto end = std::end(range);
-                ++begin;
-                return util::make_iterator_range(begin, end);
-            }
-
-            template <typename Target, std::size_t Begin, std::size_t End>
-            bool is_finished(
-                static_async_range<Target, Begin, End> const& range)
-            {
-                return range.is_finished();
-            }
-
-            template <typename Range>
-            bool is_finished(Range const& range)
-            {
-                return std::begin(range) == std::end(range);
-            }
-        }    // end namespace traversal_iterator_access
+        /// Returns a dynamic range for the given type
+        template <typename T,
+            typename Range =
+                dynamic_async_range<typename std::decay<decltype(
+                                        std::begin(std::declval<T>()))>::type,
+                    typename std::decay<decltype(
+                        std::end(std::declval<T>()))>::type>>
+        Range make_dynamic_range(T&& element)
+        {
+            return Range(std::begin(element), std::end(element));
+        }
 
         /// Represents a particular point in a asynchronous traversal hierarchy
         template <typename Frame, typename... Hierarchy>
@@ -325,10 +300,9 @@ namespace util {
                 {
                     // Store the current call hierarchy into a tuple for
                     // later reentrance.
-                    auto state = util::tuple_cat(
-                        util::make_tuple(
-                            traversal_iterator_access::next(current)),
-                        std::move(hierarchy_));
+                    auto state =
+                        util::tuple_cat(util::make_tuple(current.next()),
+                            std::move(hierarchy_));
 
                     // If the traversal method returns false, we detach the
                     // current execution context and call the visitor with the
@@ -349,8 +323,7 @@ namespace util {
                 container_category_tag<true, IsTupleLike>,
                 Current&& current)
             {
-                fork(util::make_iterator_range(
-                         std::begin(*current), std::end(*current)),
+                fork(make_dynamic_range(*current),
                     std::forward<Current>(current));
             }
 
@@ -422,7 +395,7 @@ namespace util {
             {
                 // Only process the next element if the current iterator
                 // hasn't reached its end.
-                if (!traversal_iterator_access::is_finished(current))
+                if (!current.is_finished())
                 {
                     traversal_point_of_t<Frame> point(
                         std::forward<Frame>(frame), util::make_tuple());
@@ -440,7 +413,7 @@ namespace util {
             {
                 // Only process element if the current iterator
                 // hasn't reached its end.
-                if (!traversal_iterator_access::is_finished(current))
+                if (!current.is_finished())
                 {
                     // Don't forward the arguments here, since we still need
                     // the objects in a valid state later.
@@ -453,8 +426,7 @@ namespace util {
                 // Pop the top element from the hierarchy, and shift the
                 // parent element one to the right
                 (*this)(std::forward<Frame>(frame),
-                    traversal_iterator_access::next(
-                        std::forward<Parent>(parent)),
+                    std::forward<Parent>(parent).next(),
                     std::forward<Hierarchy>(hierarchy)...);
             }
         };
