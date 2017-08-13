@@ -142,7 +142,7 @@ public:
     void operator()(int i, N&& next)
     {
         HPX_TEST_EQ(i, 1);
-        HPX_TEST_EQ(counter_.get(), 2);
+        HPX_TEST_EQ(counter_.get(), 2U);
 
         // Don't call next here
         HPX_UNUSED(next);
@@ -165,29 +165,29 @@ void test_async_traversal_base(Args&&... args)
         traverse_pack_async(async_increasing_int_sync_visitor<sizeof...(args)>(
                                 std::ref(counter)),
             args...);
-        HPX_TEST_EQ(counter, sizeof...(args) + 1);
+        HPX_TEST_EQ(counter, sizeof...(args) + 1U);
     }
 
     // Test that every element is traversed in the correct order
     // when we detach the control flow on every visit.
-    /*{
+    {
         std::size_t counter = 0;
         traverse_pack_async(
             async_increasing_int_visitor<sizeof...(args)>(std::ref(counter)),
             args...);
-        HPX_TEST_EQ(counter, sizeof...(args) + 1);
-    }*/
+        HPX_TEST_EQ(counter, sizeof...(args) + 1U);
+    }
 
     // Test that the first element is traversed only,
     // if we don't call the resume continuation.
-    /*{
+    {
         std::size_t counter = 0;
         traverse_pack_async(
             async_increasing_int_interrupted_visitor<sizeof...(args)>(
                 std::ref(counter)),
             args...);
-        HPX_TEST_EQ(counter, 2);
-    }*/
+        HPX_TEST_EQ(counter, 2U);
+    }
 }
 
 static void test_async_traversal()
@@ -216,7 +216,7 @@ int main(int, char**)
         traverse_pack_async(
             async_increasing_int_sync_visitor<4>(std::ref(counter)), 0,
             make_tuple(1, 2), 3);
-        HPX_TEST_EQ(counter, 5);
+        HPX_TEST_EQ(counter, 5U);
     }
 
     return hpx::util::report_errors();
