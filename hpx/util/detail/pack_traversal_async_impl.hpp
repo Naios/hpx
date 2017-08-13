@@ -207,10 +207,27 @@ namespace util {
             tuple<Hierarchy...> hierarchy_;
 
         public:
-            explicit async_traversal_point(Frame frame, Hierarchy... hierarchy)
+            explicit async_traversal_point(
+                Frame frame, tuple<Hierarchy...> hierarchy)
               : frame_(std::move(frame))
-              , hierarchy_(std::move(hierarchy)...)
+              , hierarchy_(std::move(hierarchy))
             {
+            }
+
+            /// Creates a new traversal point which
+            template <typename Parent>
+            auto push(Parent&& parent) -> async_traversal_point<Frame,
+                typename std::decay<Parent>::type, Hierarchy...>
+            {
+                // Create a new hierarchy which contains the
+                // the parent (the last traversed element).
+                auto hierarchy = util::tuple_cat(
+                    util::make_tuple(frame_, std::forward<Parent>(parent)),
+                    hierarchy_);
+
+                return async_traversal_point<Frame,
+                    typename std::decay<Parent>::type, Hierarchy...>(
+                    frame_, std::move(hierarchy));
             }
 
             /// Forks the current traversal point and continues the child
@@ -218,16 +235,11 @@ namespace util {
             template <typename Child, typename Parent>
             void fork(Child&& child, Parent&& parent)
             {
-                // Create a new hierarchy which contains the
-                // child (the current traversed element) and
-                // the parent (the last traversed element).
-                auto hierarchy = util::tuple_cat(
-                    util::make_tuple(frame_, std::forward<Child>(child),
-                        std::forward<Parent>(parent)),
-                    hierarchy_);
+                // Push the parent on top of the hierarchy
+                auto point = push(std::forward<Parent>(parent));
 
-                util::invoke_fused(
-                    resume_state_callable{}, std::move(hierarchy));
+                // Continue the traversal with the current element
+                point.async_traverse(std::forward<Child>(child));
             }
 
             /// Async traverse a single element, and do nothing.
@@ -253,6 +265,8 @@ namespace util {
                 -> typename always_void<decltype(
                     std::declval<Frame>()->traverse(*current))>::type
             {
+                auto&& val = *current;
+
                 if (!frame_->traverse(*current))
                 {
                     // Store the current call hierarchy into a tuple for
@@ -342,36 +356,34 @@ namespace util {
             {
                 // Don't forward the frame here, since we still need
                 // a valid reference for calling it later.
-                traversal_point_of_t<Frame> point(frame);
+                traversal_point_of_t<Frame> point(frame, util::make_tuple());
 
                 point.async_traverse(std::forward<Current>(current));
             }
-
-            // Complete the asynchrnous traversal when the last iterator
-            // was processed to its end.
-            frame->async_complete();
         }
 
         /// Reenter an asynchronous iterator pack and continue its traversal.
-        template <typename Frame, typename Current, typename Next,
+        template <typename Frame, typename Current, typename Parent,
             typename... Hierarchy>
         void resume_state_callable::operator()(Frame&& frame, Current&& current,
-            Next&& next, Hierarchy&&... hierarchy) const
+            Parent&& parent, Hierarchy&&... hierarchy) const
         {
-            // Only process the next element if the current iterator
+            // Only process element if the current iterator
             // hasn't reached its end.
             if (!current.is_finished())
             {
                 // Don't forward the arguments here, since we still need
                 // the objects in a valid state later.
-                traversal_point_of_t<Frame, Next, Hierarchy...> point(
-                    frame, next, hierarchy...);
+                traversal_point_of_t<Frame, Parent, Hierarchy...> point(
+                    frame, util::make_tuple(parent, hierarchy...));
 
                 point.async_traverse(std::forward<Current>(current));
             }
 
+            // Pop the top element from the hierarchy, and shift the
+            // parent element one to the right
             (*this)(std::forward<Frame>(frame),
-                std::forward<Next>(next).next(),
+                std::forward<Parent>(parent).next(),
                 std::forward<Hierarchy>(hierarchy)...);
         }
 
@@ -381,9 +393,13 @@ namespace util {
             try
             {
                 auto hierarchy = util::tuple_cat(
-                    util::make_tuple(std::move(frame_)), std::move(state_));
+                    util::make_tuple(frame_), std::move(state_));
                 util::invoke_fused(
                     resume_state_callable{}, std::move(hierarchy));
+
+                // Complete the asynchrnous traversal when the last iterator
+                // was processed to its end.
+                frame_->async_complete();
             }
             catch (async_traversal_detached_exception const&)
             {
