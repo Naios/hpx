@@ -153,6 +153,11 @@ namespace util {
             {
                 return static_async_range<Target, Begin + 1, End>{target_};
             }
+
+            HPX_CONSTEXPR bool is_finished() const noexcept
+            {
+                return false;
+            }
         };
         /// Specialization for the end marker which doesn't provide
         /// a particular element dereference
@@ -160,6 +165,11 @@ namespace util {
         struct static_async_range<Target, Begin, Begin>
         {
             explicit static_async_range(Target*) {}
+
+            HPX_CONSTEXPR bool is_finished() const noexcept
+            {
+                return true;
+            }
         };
 
         /// Deduces to the static range type for the given type
@@ -326,19 +336,18 @@ namespace util {
         void resume_state_callable::operator()(
             Frame&& frame, Current&& current) const
         {
-            HPX_ASSERT(frame);
-
             try
             {
-                // Don't forward the frame here, since we still need
-                // a valid reference for calling it later.
-                traversal_point_of_t<Frame> point(frame);
+                // Only process the next element if the current iterator
+                // hasn't reached its end.
+                if (!current.is_finished())
+                {
+                    // Don't forward the frame here, since we still need
+                    // a valid reference for calling it later.
+                    traversal_point_of_t<Frame> point(frame);
 
-                HPX_ASSERT(frame);
-
-                point.async_traverse(std::forward<Current>(current));
-
-                HPX_ASSERT(frame);
+                    point.async_traverse(std::forward<Current>(current));
+                }
 
                 // Complete the asynchrnous traversal when the last iterator
                 // was processed to its end.
@@ -357,14 +366,20 @@ namespace util {
         void resume_state_callable::operator()(Frame&& frame, Current&& current,
             Next&& next, Hierarchy&&... hierarchy) const
         {
-            // Don't forward the arguments here, since we still need
-            // the objects in a valid state later.
-            traversal_point_of_t<Frame, Next, Hierarchy...> point(
-                frame, next, hierarchy...);
-
             try
             {
-                point.async_traverse(std::forward<Current>(current));
+                // Only process the next element if the current iterator
+                // hasn't reached its end.
+                if (!current.is_finished())
+                {
+                    // Don't forward the arguments here, since we still need
+                    // the objects in a valid state later.
+                    traversal_point_of_t<Frame, Next, Hierarchy...> point(
+                        frame, next, hierarchy...);
+
+                    point.async_traverse(std::forward<Current>(current));
+                }
+
                 (*this)(std::forward<Frame>(frame),
                     std::forward<Next>(next).next(),
                     std::forward<Hierarchy>(hierarchy)...);

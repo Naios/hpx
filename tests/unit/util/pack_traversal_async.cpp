@@ -77,6 +77,7 @@ public:
     void operator()() const
     {
         HPX_TEST_EQ(counter_.get(), ArgCount);
+        ++counter_.get();
     }
 };
 
@@ -109,6 +110,7 @@ public:
     void operator()() const
     {
         HPX_TEST_EQ(counter_.get(), ArgCount);
+        ++counter_.get();
     }
 };
 
@@ -161,7 +163,7 @@ void test_async_traversal_base(Args&&... args)
         traverse_pack_async(async_increasing_int_sync_visitor<sizeof...(args)>(
                                 std::ref(counter)),
             args...);
-        HPX_TEST_EQ(counter, sizeof...(args));
+        HPX_TEST_EQ(counter, sizeof...(args) + 1);
     }
 
     // Test that every element is traversed in the correct order
@@ -171,7 +173,7 @@ void test_async_traversal_base(Args&&... args)
         traverse_pack_async(
             async_increasing_int_visitor<sizeof...(args)>(std::ref(counter)),
             args...);
-        HPX_TEST_EQ(counter, sizeof...(args));
+        HPX_TEST_EQ(counter, sizeof...(args) + 1);
     }
 
     // Test that the first element is traversed only,
@@ -209,10 +211,9 @@ int main(int, char**)
 
     {
         int counter = 0;
-        traverse_pack_async(async_increasing_int_sync_visitor<4>(
-                                std::ref(counter)),
+        traverse_pack_async(async_increasing_int_visitor<4>(std::ref(counter)),
             make_tuple(0, 1, 2, 3));
-        HPX_TEST_EQ(counter, 4);
+        HPX_TEST_EQ(counter, 5);
     }
 
     return hpx::util::report_errors();
