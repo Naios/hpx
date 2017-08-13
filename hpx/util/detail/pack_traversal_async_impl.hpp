@@ -185,19 +185,25 @@ namespace util {
         }
 
         template <typename Begin, typename Sentinel>
-        class dynamic_async_range
+        struct dynamic_async_range
         {
             Begin begin_;
             Sentinel sentinel_;
 
-        public:
-            explicit dynamic_async_range(
-                dynamic_async_range const& right) = default;
-
-            explicit dynamic_async_range(Begin begin, Sentinel sentinel)
-              : begin_(std::move(begin))
-              , sentinel_(std::move(sentinel))
+            Begin const& begin() const noexcept
             {
+                return begin_;
+            }
+
+            Sentinel const& end() const noexcept
+            {
+                return sentinel_;
+            }
+
+            dynamic_async_range& operator++() noexcept
+            {
+                ++begin_;
+                return *this;
             }
 
             auto operator*() const noexcept
@@ -209,7 +215,7 @@ namespace util {
             dynamic_async_range next() const
             {
                 dynamic_async_range other;
-                ++(other.begin_);
+                ++other;
                 return other;
             }
 
@@ -219,16 +225,20 @@ namespace util {
             }
         };
 
+        template <typename T>
+        using dynamic_async_range_of_t = dynamic_async_range<
+            typename std::decay<decltype(std::begin(std::declval<T>()))>::type,
+            typename std::decay<decltype(std::end(std::declval<T>()))>::type>;
+
         /// Returns a dynamic range for the given type
-        template <typename T,
-            typename Range =
-                dynamic_async_range<typename std::decay<decltype(
-                                        std::begin(std::declval<T>()))>::type,
-                    typename std::decay<decltype(
-                        std::end(std::declval<T>()))>::type>>
-        Range make_dynamic_range(T&& element)
+        template <typename T, typename Range = dynamic_async_range_of_t<T>>
+        Range make_dynamic_async_range(T&& element)
         {
-            return Range(std::begin(element), std::end(element));
+            auto size = element.size();
+            auto begin = std::begin(element);
+            auto end = std::end(element);
+            auto myend = element.end();
+            return Range{std::begin(element), std::end(element)};
         }
 
         /// Represents a particular point in a asynchronous traversal hierarchy
@@ -323,7 +333,10 @@ namespace util {
                 container_category_tag<true, IsTupleLike>,
                 Current&& current)
             {
-                fork(make_dynamic_range(*current),
+                auto const& element = *current;
+                auto newRange = make_dynamic_async_range(*current);
+
+                fork(make_dynamic_async_range(*current),
                     std::forward<Current>(current));
             }
 
@@ -359,6 +372,7 @@ namespace util {
                 (void) dummy;
             }
 
+            /// Traverse a static range
             template <typename Target, std::size_t Begin, std::size_t End>
             void async_traverse(static_async_range<Target, Begin, End> current)
             {
@@ -366,13 +380,13 @@ namespace util {
                     explicit_range_sequence_of_t<Begin, End>{}, current);
             }
 
-            template <typename Range>
-            void async_traverse(Range&& range)
+            /// Traverse a dynamic range
+            template <typename Begin, typename Sentinel>
+            void async_traverse(dynamic_async_range<Begin, Sentinel> range)
             {
-                auto end = std::end(range);
-                for (auto itr = std::begin(range); itr < end; ++itr)
+                for (; !range.is_finished(); ++range)
                 {
-                    async_traverse_one();
+                    async_traverse_one(range);
                 }
             }
         };

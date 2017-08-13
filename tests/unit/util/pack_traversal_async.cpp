@@ -14,6 +14,7 @@
 #include <functional>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 using hpx::lcos::future;
 using hpx::util::make_tuple;
@@ -194,6 +195,18 @@ static void test_async_traversal()
     test_async_traversal_base<4U>(0U, 1U, 2U, 3U);
 }
 
+static void test_async_container_traversal()
+{
+    using container = std::vector<std::size_t>;
+
+    // Test by passing a containers in the middle
+    test_async_traversal_base<4U>(0U, container{1U, 2U}, 3U);
+    // Test by splitting the pack in two containers
+    test_async_traversal_base<4U>(container{0U, 1U}, container{2U, 3U});
+    // Test by passing a huge containers to the traversal
+    test_async_traversal_base<4U>(container{0U, 1U, 2U, 3U});
+}
+
 static void test_async_tuple_like_traversal()
 {
     // Test by passing a tuple in the middle
@@ -207,6 +220,7 @@ static void test_async_tuple_like_traversal()
 int main(int, char**)
 {
     test_async_traversal();
+    test_async_container_traversal();
     test_async_tuple_like_traversal();
 
     {
