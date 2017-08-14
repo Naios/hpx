@@ -7,6 +7,7 @@
 #define HPX_UTIL_DETAIL_PACK_TRAVERSAL_IMPL_HPP
 
 #include <hpx/config.hpp>
+#include <hpx/traits/detail/reserve.hpp>
 #include <hpx/traits/is_callable.hpp>
 #include <hpx/util/always_void.hpp>
 #include <hpx/util/detail/container_category.hpp>
@@ -345,19 +346,6 @@ namespace util {
             {
             };
 
-            /// Deduces to a true type if the given parameter T
-            /// supports a `reserve` method.
-            template <typename T, typename = void>
-            struct is_reservable : std::false_type
-            {
-            };
-            template <typename T>
-            struct is_reservable<T,
-                typename always_void<decltype(std::declval<T>().reserve(
-                    std::declval<std::size_t>()))>::type> : std::true_type
-            {
-            };
-
             template <typename Dest, typename Source>
             void reserve_if_possible(
                 std::true_type, Dest& dest, Source const& source)
@@ -563,7 +551,8 @@ namespace util {
                 // We try to reserve the original size from the source
                 // container to the destination container.
                 reserve_if_possible(
-                    is_reservable<decltype(remapped)>{}, remapped, container);
+                    traits::detail::is_reservable<decltype(remapped)>{},
+                    remapped, container);
 
                 // Perform the actual value remapping from the source to
                 // the destination.
