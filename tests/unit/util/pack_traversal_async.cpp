@@ -4,10 +4,12 @@
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include <hpx/config.hpp>
+#include <hpx/util/lightweight_test.hpp>
 #include <hpx/util/pack_traversal_async.hpp>
 #include <hpx/util/tuple.hpp>
 #include <hpx/util/unused.hpp>
-#include "hpx/util/lightweight_test.hpp"
+
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -32,6 +34,8 @@ using hpx::util::tuple;
 
 template <std::size_t ArgCount>
 class async_increasing_int_sync_visitor
+  : public boost::intrusive_ref_counter<
+        async_increasing_int_sync_visitor<ArgCount>>
 {
     std::reference_wrapper<std::size_t> counter_;
 
@@ -72,6 +76,7 @@ public:
 
 template <std::size_t ArgCount>
 class async_increasing_int_visitor
+  : public boost::intrusive_ref_counter<async_increasing_int_visitor<ArgCount>>
 {
     std::reference_wrapper<std::size_t> counter_;
 
@@ -109,6 +114,8 @@ public:
 
 template <std::size_t ArgCount>
 class async_increasing_int_interrupted_visitor
+  : public boost::intrusive_ref_counter<
+        async_increasing_int_interrupted_visitor<ArgCount>>
 {
     std::reference_wrapper<std::size_t> counter_;
 
@@ -282,6 +289,7 @@ static void test_async_mixed_traversal()
 
 template <std::size_t ArgCount>
 class async_unique_sync_visitor
+  : public boost::intrusive_ref_counter<async_unique_sync_visitor<ArgCount>>
 {
     std::reference_wrapper<std::size_t> counter_;
 
@@ -324,6 +332,7 @@ public:
 
 template <std::size_t ArgCount>
 class async_unique_visitor
+  : public boost::intrusive_ref_counter<async_unique_visitor<ArgCount>>
 {
     std::reference_wrapper<std::size_t> counter_;
 

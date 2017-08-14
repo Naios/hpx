@@ -65,9 +65,11 @@ namespace util {
     ///
     /// See `traverse_pack` for a detailed description.
     template <typename Visitor, typename... T>
-    void traverse_pack_async(Visitor&& visitor, T&&... pack)
+    auto traverse_pack_async(Visitor&& visitor, T&&... pack)
+        -> decltype(detail::apply_pack_transform_async(
+            std::forward<Visitor>(visitor), std::forward<T>(pack)...))
     {
-        detail::apply_pack_transform_async(
+        return detail::apply_pack_transform_async(
             std::forward<Visitor>(visitor), std::forward<T>(pack)...);
     }
 }    // end namespace util

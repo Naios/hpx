@@ -15,22 +15,29 @@
 #include <hpx/util/iterator_range.hpp>
 #include <hpx/util/tuple.hpp>
 
+#include <boost/intrusive_ptr.hpp>
+
 #include <cstddef>
 #include <exception>
 #include <iterator>
-#include <memory>
 #include <type_traits>
 #include <utility>
 
 namespace hpx {
 namespace util {
     namespace detail {
+        /// A tag which is passed to the `operator()` of the visitor
+        /// if an element is visited synchronously.
         struct async_traverse_visit_tag
         {
         };
+        /// A tag which is passed to the `operator()` of the visitor
+        /// if an element is visited after the traversal was detached.
         struct async_traverse_detach_tag
         {
         };
+        /// A tag which is passed to the `operator()` of the visitor
+        /// if the asynchronous pack traversal was finished.
         struct async_traverse_complete_tag
         {
         };
@@ -82,10 +89,7 @@ namespace util {
 
         /// Stores the visitor and the arguments to traverse
         template <typename Visitor, typename... Args>
-        class async_traversal_frame
-          : public Visitor
-          , public std::enable_shared_from_this<
-                async_traversal_frame<Visitor, Args...>>
+        class async_traversal_frame : public Visitor
         {
             tuple<Args...> args_;
 
@@ -126,11 +130,12 @@ namespace util {
             /// which is capable of continuing the asynchrone traversal
             /// when it's called later.
             template <typename T, typename Hierarchy>
-            void async_continue(T&& value, Hierarchy&& hierarchy)
+            void async_continue(
+                boost::intrusive_ptr<async_traversal_frame> self, T&& value,
+                Hierarchy&& hierarchy)
             {
-                auto resumable =
-                    make_resume_traversal_callable(this->shared_from_this(),
-                        std::forward<Hierarchy>(hierarchy));
+                auto resumable = make_resume_traversal_callable(
+                    std::move(self), std::forward<Hierarchy>(hierarchy));
                 util::invoke(visitor(), async_traverse_detach_tag{},
                     std::forward<T>(value), std::move(resumable));
             }
@@ -323,10 +328,15 @@ namespace util {
                         util::tuple_cat(util::make_tuple(current.next()),
                             std::move(hierarchy_));
 
+                    // Save the frame pointer because we invalidate it below
+                    auto frame = frame_.get();
+
                     // If the traversal method returns false, we detach the
                     // current execution context and call the visitor with the
                     // element and a continue callable object again.
-                    frame_->async_continue(*current, std::move(state));
+
+                    frame->async_continue(
+                        std::move(frame_), *current, std::move(state));
 
                     // Then detach the current execution context through throwing
                     // an async_traversal_detached_exception which is catched
@@ -472,17 +482,29 @@ namespace util {
             }
         }
 
+        // Create the frame on the heap which stores the arguments
+        // to traverse asynchronous.
+        template <typename Mapper, typename... T,
+            typename frame_type =
+                async_traversal_frame<typename std::decay<Mapper>::type,
+                    typename std::decay<T>::type...>>
+        boost::intrusive_ptr<frame_type> create_async_traversal_frame(
+            Mapper&& mapper, T&&... pack)
+        {
+            auto ptr = new frame_type(
+                std::forward<Mapper>(mapper), std::forward<T>(pack)...);
+
+            /// Create a intrusive_ptr from the heap object
+            return boost::intrusive_ptr<frame_type>(ptr);
+        }
+
         /// Traverses the given pack with the given mapper
         template <typename Mapper, typename... T>
-        void apply_pack_transform_async(Mapper&& mapper, T&&... pack)
+        auto apply_pack_transform_async(Mapper&& mapper, T&&... pack)
+            -> decltype(create_async_traversal_frame(
+                std::forward<Mapper>(mapper), std::forward<T>(pack)...))
         {
-            using frame_type =
-                async_traversal_frame<typename std::decay<Mapper>::type,
-                    typename std::decay<T>::type...>;
-
-            // Create the frame on the heap which stores the arguments
-            // to traverse asynchronous.
-            auto frame = std::make_shared<frame_type>(
+            auto frame = create_async_traversal_frame(
                 std::forward<Mapper>(mapper), std::forward<T>(pack)...);
 
             // Create a static range for the top level tuple
@@ -493,6 +515,7 @@ namespace util {
 
             // Start the asynchronous traversal
             resumer();
+            return frame;
         }
     }    // end namespace detail
 }    // end namespace util
