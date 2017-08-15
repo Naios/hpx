@@ -136,6 +136,7 @@ namespace hpx
 
 #include <hpx/config.hpp>
 #include <hpx/lcos/detail/future_data.hpp>
+#include <hpx/lcos/detail/future_when_all.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/lcos/when_some.hpp>
 #include <hpx/traits/acquire_future.hpp>
@@ -145,6 +146,7 @@ namespace hpx
 #include <hpx/traits/is_future.hpp>
 #include <hpx/traits/is_future_range.hpp>
 #include <hpx/util/decay.hpp>
+#include <hpx/util/pack_traversal_async.hpp>
 #include <hpx/util/deferred_call.hpp>
 #include <hpx/util/range.hpp>
 #include <hpx/util/tuple.hpp>
@@ -187,6 +189,46 @@ namespace hpx { namespace lcos
             static type call(util::tuple<T>&& t)
             {
                 return std::move(util::get<0>(t));
+            }
+        };
+
+        template <typename Tuple>
+        class async_when_all_frame
+          : public future_data<typename when_all_result<Tuple>::type>
+        {
+        public:
+            typedef typename when_all_result<Tuple>::type result_type;
+            typedef hpx::lcos::future<result_type> type;
+            typedef hpx::lcos::detail::future_data<result_type> base_type;
+
+            explicit async_when_all_frame(
+                typename base_type::init_no_addref no_addref)
+              : future_data<typename when_all_result<Tuple>::type>(no_addref)
+            {
+            }
+
+            template <typename T>
+            auto operator()(util::async_traverse_visit_tag, T&& current)
+                -> decltype(async_visit_future(std::forward<T>(current)))
+            {
+                return async_visit_future(std::forward<T>(current));
+            }
+
+            template <typename T, typename N>
+            auto operator()(
+                util::async_traverse_detach_tag, T&& current, N&& next)
+                -> decltype(async_detach_future(
+                    std::forward<T>(current), std::forward<N>(next)))
+            {
+                return async_detach_future(
+                    std::forward<T>(current), std::forward<N>(next));
+            }
+
+            template <typename T>
+            void operator()(util::async_traverse_complete_tag, T&& pack)
+            {
+                this->set_value(
+                    when_all_result<Tuple>::call(std::forward<T>(pack)));
             }
         };
 
@@ -423,7 +465,7 @@ namespace hpx { namespace lcos
     template <typename T, typename... Ts>
     typename std::enable_if<
         !(traits::is_future_range<T>::value && sizeof...(Ts) == 0),
-        typename detail::when_all_frame<
+        typename detail::async_when_all_frame<
             util::tuple<
                 typename traits::acquire_future<T>::type,
                 typename traits::acquire_future<Ts>::type...
@@ -436,20 +478,19 @@ namespace hpx { namespace lcos
                 typename traits::acquire_future<T>::type,
                 typename traits::acquire_future<Ts>::type...
             > result_type;
-        typedef detail::when_all_frame<result_type> frame_type;
-        typedef typename frame_type::init_no_addref init_no_addref;
+        typedef detail::async_when_all_frame<result_type> frame_type;
 
         traits::acquire_future_disp func;
-        result_type values(
-            func(std::forward<T>(t)),
-            func(std::forward<Ts>(ts))...);
 
-        boost::intrusive_ptr<frame_type> p(
-            new frame_type(std::move(values), init_no_addref()), false);
-        p->do_await();
+        typename frame_type::base_type::init_no_addref no_addref;
+
+        auto frame = util::traverse_pack_async(
+            util::async_traverse_in_place_tag<frame_type>{}, no_addref,
+            func(std::forward<T>(t)), func(std::forward<Ts>(ts))...);
 
         using traits::future_access;
-        return future_access<typename frame_type::type>::create(std::move(p));
+        return future_access<typename frame_type::type>::create(
+            std::move(frame));
     }
 }}
 
