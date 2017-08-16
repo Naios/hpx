@@ -53,6 +53,17 @@ namespace lcos {
             state->set_on_completed(util::deferred_call(std::forward<N>(next)));
         }
 
+        template <typename Iterator, >
+        auto box_future_iterators(Iterator begin, Iterator end)
+        {
+            
+        }
+
+        /*template <typename Iterator, typename Container =
+        std::vector<typename lcos::detail::future_iterator_traits<Iterator>::type> >
+    lcos::future<Container>
+    when_all(Iterator begin, Iterator end)*/
+
     }    // end namespace detail
 }    // end namespace lcos
 }    // end namespace hpx

@@ -138,21 +138,14 @@ namespace hpx
 #include <hpx/lcos/detail/future_data.hpp>
 #include <hpx/lcos/detail/future_when_all.hpp>
 #include <hpx/lcos/future.hpp>
-#include <hpx/lcos/when_some.hpp>
 #include <hpx/traits/acquire_future.hpp>
-#include <hpx/traits/acquire_shared_state.hpp>
 #include <hpx/traits/detail/reserve.hpp>
 #include <hpx/traits/future_access.hpp>
 #include <hpx/traits/is_future.hpp>
 #include <hpx/traits/is_future_range.hpp>
-#include <hpx/util/decay.hpp>
 #include <hpx/util/pack_traversal_async.hpp>
-#include <hpx/util/deferred_call.hpp>
 #include <hpx/util/range.hpp>
 #include <hpx/util/tuple.hpp>
-#include <hpx/util/unwrap_ref.hpp>
-
-#include <boost/intrusive_ptr.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -231,6 +224,34 @@ namespace hpx { namespace lcos
                     when_all_result<Tuple>::call(std::forward<T>(pack)));
             }
         };
+
+        template <typename T, typename... Ts>
+        typename detail::async_when_all_frame<
+            util::tuple<
+                typename traits::acquire_future<T>::type,
+                typename traits::acquire_future<Ts>::type...
+            >
+        >::type
+        when_all_impl(T&& t, Ts&&... ts)
+        {
+            typedef util::tuple<
+                    typename traits::acquire_future<T>::type,
+                    typename traits::acquire_future<Ts>::type...
+                > result_type;
+            typedef detail::async_when_all_frame<result_type> frame_type;
+
+            traits::acquire_future_disp func;
+
+            typename frame_type::base_type::init_no_addref no_addref;
+
+            auto frame = util::traverse_pack_async(
+                util::async_traverse_in_place_tag<frame_type>{}, no_addref,
+                func(std::forward<T>(t)), func(std::forward<Ts>(ts))...);
+
+            using traits::future_access;
+            return future_access<typename frame_type::type>::create(
+                std::move(frame));
+        }
     }
 
     template <typename Iterator, typename Container =
@@ -249,7 +270,7 @@ namespace hpx { namespace lcos
         std::transform(begin, end, std::back_inserter(lazy_values_),
             traits::acquire_future_disp());
 
-        return lcos::when_all(std::move(lazy_values_));
+        return detail::when_all_impl(std::move(lazy_values_));
     }
 
     inline lcos::future<util::tuple<> > //-V524
@@ -272,36 +293,27 @@ namespace hpx { namespace lcos
         for (std::size_t i = 0; i != count; ++i)
             values.push_back(func(*begin++));
 
-        return lcos::when_all(std::move(values));
+        return detail::when_all_impl(std::move(values));
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    template <typename T, typename... Ts>
-    typename detail::async_when_all_frame<
-        util::tuple<
-            typename traits::acquire_future<T>::type,
-            typename traits::acquire_future<Ts>::type...
-        >
-    >::type
-    when_all(T&& t, Ts&&... ts)
+    template <typename First>
+    auto when_all(First&& first)
+        -> decltype(detail::when_all_impl(std::forward<First>(first)))
     {
-        typedef util::tuple<
-                typename traits::acquire_future<T>::type,
-                typename traits::acquire_future<Ts>::type...
-            > result_type;
-        typedef detail::async_when_all_frame<result_type> frame_type;
+        return detail::when_all_impl(std::forward<First>(first));
+    }
 
-        traits::acquire_future_disp func;
-
-        typename frame_type::base_type::init_no_addref no_addref;
-
-        auto frame = util::traverse_pack_async(
-            util::async_traverse_in_place_tag<frame_type>{}, no_addref,
-            func(std::forward<T>(t)), func(std::forward<Ts>(ts))...);
-
-        using traits::future_access;
-        return future_access<typename frame_type::type>::create(
-            std::move(frame));
+    ///////////////////////////////////////////////////////////////////////////
+    template <typename First, typename Second, typename Third, typename... Rest>
+    auto when_all(First&& first, Second&& second, Third&& third, Rest&&... rest)
+        -> decltype(detail::when_all_impl(std::forward<First>(first),
+            std::forward<Second>(second), std::forward<Third>(third),
+            std::forward<Rest>(rest)...))
+    {
+        return detail::when_all_impl(std::forward<First>(first),
+            std::forward<Second>(second), std::forward<Third>(third),
+            std::forward<Rest>(rest)...);
     }
 }}
 
