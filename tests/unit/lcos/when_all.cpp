@@ -63,8 +63,7 @@ void test_wait_for_all_from_list_iterators()
     }
 
     hpx::lcos::future<Container> r =
-        hpx::when_all<typename Container::iterator,
-            Container>(futures.begin(), futures.end());
+        hpx::when_all(futures.begin(), futures.end());
 
     Container result = r.get();
 
