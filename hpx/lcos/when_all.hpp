@@ -136,18 +136,15 @@ namespace hpx
 
 #include <hpx/config.hpp>
 #include <hpx/lcos/detail/future_data.hpp>
-#include <hpx/lcos/detail/future_when_all.hpp>
+#include <hpx/lcos/detail/future_transforms.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/traits/acquire_future.hpp>
-#include <hpx/traits/detail/reserve.hpp>
 #include <hpx/traits/future_access.hpp>
 #include <hpx/traits/is_future.hpp>
 #include <hpx/traits/is_future_range.hpp>
 #include <hpx/util/pack_traversal_async.hpp>
-#include <hpx/util/range.hpp>
 #include <hpx/util/tuple.hpp>
 
-#include <algorithm>
 #include <cstddef>
 #include <iterator>
 #include <type_traits>
@@ -276,10 +273,10 @@ namespace hpx { namespace lcos
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    template <typename Iterator, typename Container =
-        std::vector<typename lcos::detail::future_iterator_traits<Iterator>::type> >
-    lcos::future<Container>
-    when_all_n(Iterator begin, std::size_t count)
+    template <typename Iterator,
+        typename Container = std::vector<
+            typename lcos::detail::future_iterator_traits<Iterator>::type>>
+    lcos::future<Container> when_all_n(Iterator begin, std::size_t count)
     {
         return detail::when_all_impl(
             acquire_future_n<Iterator, Container>(begin, count));
