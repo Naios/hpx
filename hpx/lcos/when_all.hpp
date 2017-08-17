@@ -264,17 +264,8 @@ namespace hpx { namespace lcos
             typename detail::future_iterator_traits<Iterator>::type>>
     future<Container> when_all(Iterator begin, Iterator end)
     {
-        Container lazy_values_;
-
-        auto difference = std::distance(begin, end);
-        if (difference > 0)
-            traits::detail::reserve_if_reservable(
-                lazy_values_, static_cast<std::size_t>(difference));
-
-        std::transform(begin, end, std::back_inserter(lazy_values_),
-            traits::acquire_future_disp());
-
-        return detail::when_all_impl(std::move(lazy_values_));
+        return detail::when_all_impl(
+            detail::acquire_future_iterators<Iterator, Container>(begin, end));
     }
 
     inline lcos::future<util::tuple<> > //-V524
@@ -290,14 +281,8 @@ namespace hpx { namespace lcos
     lcos::future<Container>
     when_all_n(Iterator begin, std::size_t count)
     {
-        Container values;
-        traits::detail::reserve_if_reservable(values, count);
-
-        traits::acquire_future_disp func;
-        for (std::size_t i = 0; i != count; ++i)
-            values.push_back(func(*begin++));
-
-        return detail::when_all_impl(std::move(values));
+        return detail::when_all_impl(
+            acquire_future_n<Iterator, Container>(begin, count));
     }
 
     ///////////////////////////////////////////////////////////////////////////
