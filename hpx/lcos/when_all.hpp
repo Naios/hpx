@@ -252,25 +252,26 @@ namespace hpx { namespace lcos
             return future_access<typename frame_type::type>::create(
                 std::move(frame));
         }
+
+        struct when_all_impl_callable
+        {
+            template <typename... Args>
+            auto operator()(Args&&... args) const
+                -> decltype(when_all_impl(std::forward<Args>(args)...))
+            {
+                return when_all_impl(std::forward<Args>(args)...);
+            }
+        };
     }
 
-    template <typename Iterator, typename Container =
-        std::vector<typename lcos::detail::future_iterator_traits<Iterator>::type> >
-    lcos::future<Container>
-    when_all(Iterator begin, Iterator end)
+    template <typename First, typename Second>
+    auto when_all(First&& first, Second&& second) -> decltype(
+        detail::dispatch_iterator_overload(detail::when_all_impl_callable{},
+            std::forward<First>(first), std::forward<Second>(second)))
     {
-        Container lazy_values_;
-
-        typename std::iterator_traits<Iterator>::
-            difference_type difference = std::distance(begin, end);
-        if (difference > 0)
-            traits::detail::reserve_if_reservable(
-                lazy_values_, static_cast<std::size_t>(difference));
-
-        std::transform(begin, end, std::back_inserter(lazy_values_),
-            traits::acquire_future_disp());
-
-        return detail::when_all_impl(std::move(lazy_values_));
+        return detail::dispatch_iterator_overload(
+            detail::when_all_impl_callable{}, std::forward<First>(first),
+            std::forward<Second>(second));
     }
 
     inline lcos::future<util::tuple<> > //-V524
@@ -297,23 +298,13 @@ namespace hpx { namespace lcos
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    template <typename First>
-    auto when_all(First&& first)
-        -> decltype(detail::when_all_impl(std::forward<First>(first)))
+    template <typename... Args,
+        typename std::enable_if<(sizeof...(Args) == 1U) ||
+            (sizeof...(Args) > 2U)>::type* = nullptr>
+    auto when_all(Args&&... args)
+        -> decltype(detail::when_all_impl(std::forward<Args>(args)...))
     {
-        return detail::when_all_impl(std::forward<First>(first));
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    template <typename First, typename Second, typename Third, typename... Rest>
-    auto when_all(First&& first, Second&& second, Third&& third, Rest&&... rest)
-        -> decltype(detail::when_all_impl(std::forward<First>(first),
-            std::forward<Second>(second), std::forward<Third>(third),
-            std::forward<Rest>(rest)...))
-    {
-        return detail::when_all_impl(std::forward<First>(first),
-            std::forward<Second>(second), std::forward<Third>(third),
-            std::forward<Rest>(rest)...);
+        return detail::when_all_impl(std::forward<Args>(args)...);
     }
 }}
 

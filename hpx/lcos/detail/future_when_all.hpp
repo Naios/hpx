@@ -6,12 +6,16 @@
 #ifndef HPX_LCOS_DETAIL_FUTURE_WHEN_ALL_HPP
 #define HPX_LCOS_DETAIL_FUTURE_WHEN_ALL_HPP
 
+#include <hpx/lcos/future.hpp>
 #include <hpx/traits/acquire_shared_state.hpp>
+#include <hpx/traits/detail/reserve.hpp>
 #include <hpx/traits/is_future.hpp>
+#include <hpx/traits/is_future_iterator.hpp>
 #include <hpx/util/deferred_call.hpp>
 
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace hpx {
 namespace lcos {
@@ -53,17 +57,36 @@ namespace lcos {
             state->set_on_completed(util::deferred_call(std::forward<N>(next)));
         }
 
-        /*template <typename Iterator, >
-        auto box_future_iterators(Iterator begin, Iterator end)
+        /// Helper for disambiguating the two iterator overload from the
+        /// overload taking two arguments.
+        template <typename Dispatcher, typename First, typename Second>
+        auto dispatch_iterator_overload(
+            Dispatcher&& dispatcher, First&& first, Second&& second)
+            -> decltype(std::forward<Dispatcher>(dispatcher)(
+                std::forward<First>(first), std::forward<Second>(second)))
         {
-            
-        }*/
+            return std::forward<Dispatcher>(dispatcher)(
+                std::forward<First>(first), std::forward<Second>(second));
+        }
+        template <typename Dispatcher, typename Iterator,
+            typename Container =
+                std::vector<typename future_iterator_traits<Iterator>::type>>
+        future<Container> dispatch_iterator_overload(
+            Dispatcher&& dispatcher, Iterator begin, Iterator end)
+        {
+            Container lazy_values_;
 
-        /*template <typename Iterator, typename Container =
-        std::vector<typename lcos::detail::future_iterator_traits<Iterator>::type> >
-    lcos::future<Container>
-    when_all(Iterator begin, Iterator end)*/
+            auto difference = std::distance(begin, end);
+            if (difference > 0)
+                traits::detail::reserve_if_reservable(
+                    lazy_values_, static_cast<std::size_t>(difference));
 
+            std::transform(begin, end, std::back_inserter(lazy_values_),
+                traits::acquire_future_disp());
+
+            return std::forward<Dispatcher>(dispatcher)(
+                std::move(lazy_values_));
+        }
     }    // end namespace detail
 }    // end namespace lcos
 }    // end namespace hpx
