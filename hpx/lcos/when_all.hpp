@@ -142,7 +142,6 @@ namespace hpx
 #include <hpx/traits/detail/reserve.hpp>
 #include <hpx/traits/future_access.hpp>
 #include <hpx/traits/is_future.hpp>
-// #include <hpx/traits/is_future_iterator.hpp>
 #include <hpx/traits/is_future_range.hpp>
 #include <hpx/util/pack_traversal_async.hpp>
 #include <hpx/util/range.hpp>
@@ -226,19 +225,16 @@ namespace hpx { namespace lcos
             }
         };
 
-        template <typename T, typename... Ts>
+        template <typename... T>
         typename detail::async_when_all_frame<
             util::tuple<
-                typename traits::acquire_future<T>::type,
-                typename traits::acquire_future<Ts>::type...
+                typename traits::acquire_future<T>::type...
             >
         >::type
-        when_all_impl(T&& t, Ts&&... ts)
+        when_all_impl(T&&... args)
         {
-            typedef util::tuple<
-                    typename traits::acquire_future<T>::type,
-                    typename traits::acquire_future<Ts>::type...
-                > result_type;
+            typedef util::tuple<typename traits::acquire_future<T>::type...>
+                result_type;
             typedef detail::async_when_all_frame<result_type> frame_type;
 
             traits::acquire_future_disp func;
@@ -247,27 +243,15 @@ namespace hpx { namespace lcos
 
             auto frame = util::traverse_pack_async(
                 util::async_traverse_in_place_tag<frame_type>{}, no_addref,
-                func(std::forward<T>(t)), func(std::forward<Ts>(ts))...);
+                func(std::forward<T>(args))...);
 
             using traits::future_access;
             return future_access<typename frame_type::type>::create(
                 std::move(frame));
         }
-
-        struct when_all_impl_callable
-        {
-            template <typename... Args>
-            auto operator()(Args&&... args) const
-                -> decltype(when_all_impl(std::forward<Args>(args)...))
-            {
-                return when_all_impl(std::forward<Args>(args)...);
-            }
-        };
     }
 
-    template <typename First, typename Second/*,
-        typename std::enable_if<!traits::is_future_iterator<
-            typename std::decay<First>::type>::value>::type* = nullptr*/>
+    template <typename First, typename Second>
     auto when_all(First&& first, Second&& second)
         -> decltype(detail::when_all_impl(
             std::forward<First>(first), std::forward<Second>(second)))

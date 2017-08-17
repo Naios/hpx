@@ -59,7 +59,7 @@ namespace lcos {
 
         /// Helper for disambiguating the two iterator overload from the
         /// overload taking two arguments.
-        template <typename Dispatcher, typename First, typename Second>
+        /*template <typename Dispatcher, typename First, typename Second>
         auto dispatch_iterator_overload(
             Dispatcher&& dispatcher, First&& first, Second&& second)
             -> decltype(std::forward<Dispatcher>(dispatcher)(
@@ -86,7 +86,7 @@ namespace lcos {
 
             return std::forward<Dispatcher>(dispatcher)(
                 std::move(lazy_values_));
-        }
+        }*/
     }    // end namespace detail
 }    // end namespace lcos
 }    // end namespace hpx
