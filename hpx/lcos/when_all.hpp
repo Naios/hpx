@@ -142,6 +142,7 @@ namespace hpx
 #include <hpx/traits/detail/reserve.hpp>
 #include <hpx/traits/future_access.hpp>
 #include <hpx/traits/is_future.hpp>
+// #include <hpx/traits/is_future_iterator.hpp>
 #include <hpx/traits/is_future_range.hpp>
 #include <hpx/util/pack_traversal_async.hpp>
 #include <hpx/util/range.hpp>
@@ -264,14 +265,32 @@ namespace hpx { namespace lcos
         };
     }
 
-    template <typename First, typename Second>
-    auto when_all(First&& first, Second&& second) -> decltype(
-        detail::dispatch_iterator_overload(detail::when_all_impl_callable{},
+    template <typename First, typename Second/*,
+        typename std::enable_if<!traits::is_future_iterator<
+            typename std::decay<First>::type>::value>::type* = nullptr*/>
+    auto when_all(First&& first, Second&& second)
+        -> decltype(detail::when_all_impl(
             std::forward<First>(first), std::forward<Second>(second)))
     {
-        return detail::dispatch_iterator_overload(
-            detail::when_all_impl_callable{}, std::forward<First>(first),
-            std::forward<Second>(second));
+        return detail::when_all_impl(
+            std::forward<First>(first), std::forward<Second>(second));
+    }
+    template <typename Iterator,
+        typename Container = std::vector<
+            typename detail::future_iterator_traits<Iterator>::type>>
+    future<Container> when_all(Iterator begin, Iterator end)
+    {
+        Container lazy_values_;
+
+        auto difference = std::distance(begin, end);
+        if (difference > 0)
+            traits::detail::reserve_if_reservable(
+                lazy_values_, static_cast<std::size_t>(difference));
+
+        std::transform(begin, end, std::back_inserter(lazy_values_),
+            traits::acquire_future_disp());
+
+        return detail::when_all_impl(std::move(lazy_values_));
     }
 
     inline lcos::future<util::tuple<> > //-V524
