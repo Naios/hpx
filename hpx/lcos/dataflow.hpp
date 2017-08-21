@@ -28,8 +28,8 @@
 #include <hpx/util/annotated_function.hpp>
 #include <hpx/util/deferred_call.hpp>
 #include <hpx/util/invoke_fused.hpp>
-#include <hpx/util/pack_traversal_async.hpp>
 #include <hpx/util/pack_traversal.hpp>
+#include <hpx/util/pack_traversal_async.hpp>
 #include <hpx/util/thread_description.hpp>
 #include <hpx/util/tuple.hpp>
 
@@ -103,15 +103,14 @@ namespace hpx { namespace lcos { namespace detail
         {}
     };
 
+    /// Helper to invalidate the futures contained in the given pack in order
+    /// to to break cycles.
     template<typename T>
     void invalidate_futures(T&& futures)
     {
-        /*
-         reset_dataflow_future reset;
-                int const _sequencer[] = {
-                    ((reset(util::get<Is>(futures_))), 0)...
-                };
-         */
+        // Invalidate all futures which are contained recursively inside
+        // the given tuple of futures and non futures.
+        util::traverse_pack(reset_dataflow_future{}, std::forward<T>(futures));
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -169,7 +168,7 @@ namespace hpx { namespace lcos { namespace detail
             return construction_data{std::move(policy), std::move(func)};
         }
 
-        dataflow_frame(construction_data data)
+        explicit dataflow_frame(construction_data data)
           : base_type(init_no_addref{})
           , policy_(std::move(data.policy_))
           , func_(std::move(data.func_))
@@ -187,8 +186,8 @@ namespace hpx { namespace lcos { namespace detail
                 result_type res =
                     util::invoke_fused(func_, std::move(futures));
 
-                // Bad!
-                // invalidate_futures(futures_);
+                // Reassigning a moved value isn't UB
+                invalidate_futures(std::move(futures));
 
                 this->set_data(std::move(res));
             }
@@ -205,8 +204,8 @@ namespace hpx { namespace lcos { namespace detail
             try {
                 util::invoke_fused(func_, std::move(futures));
 
-                // Bad!
-                // invalidate_futures(futures_);
+                // Reassigning a moved value isn't UB
+                invalidate_futures(std::move(futures));
 
                 this->set_data(util::unused_type());
             }
