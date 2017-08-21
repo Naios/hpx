@@ -29,6 +29,7 @@
 #include <hpx/util/deferred_call.hpp>
 #include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/pack_traversal_async.hpp>
+#include <hpx/util/pack_traversal.hpp>
 #include <hpx/util/thread_description.hpp>
 #include <hpx/util/tuple.hpp>
 
@@ -155,20 +156,20 @@ namespace hpx { namespace lcos { namespace detail
         typedef typename base_type::init_no_addref init_no_addref;
 
         /// A struct to construct the dataflow_frame in-place
-        template<bool ShouldInitNoAddref>
         struct construction_data
         {
             Policy policy_;
             Func func_;
         };
 
-        dataflow_frame(construction_data<false> data)
-          : policy_(std::move(data.policy_))
-          , func_(std::move(data.func_))
+        /// Construct the dataflow_frame from the given policy
+        /// and callable object.
+        static construction_data construct_from(Policy policy, Func func)
         {
+            return construction_data{std::move(policy), std::move(func)};
         }
 
-        dataflow_frame(construction_data<true> data)
+        dataflow_frame(construction_data data)
           : base_type(init_no_addref{})
           , policy_(std::move(data.policy_))
           , func_(std::move(data.func_))
@@ -399,17 +400,19 @@ namespace hpx { namespace lcos { namespace detail
                 >
                 frame_type;
 
-            using construction_data = typename frame_type::construction_data ;
+            // Create the data which is used to construct the dataflow_frame
+            auto data = frame_type::construct_from(
+                std::forward<Policy>(launch_policy), Derived{});
 
-            construction_data data{
-                std::forward<Policy>(launch_policy), Derived{}};
-
+            // Construct the dataflow_frame and traverse
+            // the arguments asynchronously
             boost::intrusive_ptr<frame_type> p = util::traverse_pack_async(
                 util::async_traverse_in_place_tag<frame_type>{},
                 std::move(data), id,
                 traits::acquire_future_disp()(std::forward<Ts>(ts))...);
 
-            return traits::future_access<typename frame_type::type>::create(
+            using traits::future_access;
+            return future_access<typename frame_type::type>::create(
                 std::move(p));
         }
 
