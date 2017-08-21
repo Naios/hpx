@@ -11,13 +11,13 @@
 
 #include <hpx/config.hpp>
 #include <hpx/apply.hpp>
+#include <hpx/lcos/detail/future_transforms.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/runtime/get_worker_thread_num.hpp>
 #include <hpx/runtime/launch_policy.hpp>
 #include <hpx/traits/acquire_future.hpp>
 #include <hpx/traits/extract_action.hpp>
 #include <hpx/traits/future_access.hpp>
-#include <hpx/traits/future_traits.hpp>
 #include <hpx/traits/is_action.hpp>
 #include <hpx/traits/is_distribution_policy.hpp>
 #include <hpx/traits/is_executor.hpp>
@@ -27,12 +27,10 @@
 #include <hpx/traits/promise_local_result.hpp>
 #include <hpx/util/annotated_function.hpp>
 #include <hpx/util/deferred_call.hpp>
-#include <hpx/util/detail/pack.hpp>
 #include <hpx/util/invoke_fused.hpp>
-#include <hpx/util/range.hpp>
+#include <hpx/util/pack_traversal_async.hpp>
 #include <hpx/util/thread_description.hpp>
 #include <hpx/util/tuple.hpp>
-#include <hpx/util/unwrap_ref.hpp>
 
 #if defined(HPX_HAVE_EXECUTOR_COMPATIBILITY)
 #include <hpx/traits/is_executor_v1.hpp>
@@ -148,27 +146,6 @@ namespace hpx { namespace lcos { namespace detail
 
         using is_void_result = std::is_void<result_type>;
 
-        // TODO Remove
-        typedef typename util::detail::make_index_pack<
-                util::tuple_size<Futures>::value
-            >::type indices_type;
-
-        // TODO Remove
-        template <std::size_t I>
-        struct is_end
-          : std::integral_constant<
-                bool,
-                util::tuple_size<Futures>::value == I
-            >
-        {};
-
-        // TODO Remove
-        typedef typename std::conditional<
-                is_void_result::value
-              , void(dataflow_frame::*)(indices_type, std::true_type)
-              , void(dataflow_frame::*)(indices_type, std::false_type)
-            >::type execute_function_type;
-
     private:
         // workaround gcc regression wrongly instantiating constructors
         dataflow_frame();
@@ -198,7 +175,7 @@ namespace hpx { namespace lcos { namespace detail
         {
         }
 
-    protected:
+    private:
         ///////////////////////////////////////////////////////////////////////
         /// Passes the futures into the evaluation function and
         /// sets the result future.
@@ -253,7 +230,8 @@ namespace hpx { namespace lcos { namespace detail
 
             // simply schedule new thread
             threads::register_thread_nullary(
-                util::deferred_call(&dataflow_frame::done, std::move(this_))
+                util::deferred_call(&dataflow_frame::done, std::move(this_),
+                                    std::move(futures))
               , desc
               , threads::pending
               , true
@@ -263,19 +241,20 @@ namespace hpx { namespace lcos { namespace detail
         }
 
         HPX_FORCEINLINE
-        void finalize(hpx::detail::sync_policy)
+        void finalize(hpx::detail::sync_policy, Futures&& futures)
         {
-            done();
+            done(std::move(futures));
         }
 
-        void finalize(hpx::detail::fork_policy policy)
+        void finalize(hpx::detail::fork_policy policy, Futures&& futures)
         {
             // schedule the final function invocation with high priority
             util::thread_description desc(func_, "dataflow_frame::finalize");
             boost::intrusive_ptr<dataflow_frame> this_(this);
 
             threads::thread_id_type tid = threads::register_thread_nullary(
-                util::deferred_call(&dataflow_frame::done, std::move(this_))
+                util::deferred_call(&dataflow_frame::done, std::move(this_),
+                                    std::move(futures))
               , desc
               , threads::pending_do_not_schedule
               , true
@@ -290,27 +269,28 @@ namespace hpx { namespace lcos { namespace detail
             }
         }
 
-        void finalize(launch policy)
+        void finalize(launch policy, Futures&& futures)
         {
             if (policy == launch::sync)
             {
-                finalize(launch::sync);
+                finalize(launch::sync, std::move(futures));
             }
             else if (policy == launch::fork)
             {
-                finalize(launch::fork);
+                finalize(launch::fork, std::move(futures));
             }
             else
             {
-                finalize(launch::async);
+                finalize(launch::async, std::move(futures));
             }
         }
 
         HPX_FORCEINLINE
-        void finalize(threads::executor& sched)
+        void finalize(threads::executor& sched, Futures&& futures)
         {
             boost::intrusive_ptr<dataflow_frame> this_(this);
-            hpx::apply(sched, &dataflow_frame::done, std::move(this_));
+            hpx::apply(sched, &dataflow_frame::done, std::move(this_),
+                std::move(futures));
         }
 
 #if defined(HPX_HAVE_EXECUTOR_COMPATIBILITY)
@@ -320,11 +300,11 @@ namespace hpx { namespace lcos { namespace detail
         typename std::enable_if<
             traits::is_executor<Executor>::value
         >::type
-        finalize(Executor& exec)
+        finalize(Executor& exec, Futures&& futures)
         {
             boost::intrusive_ptr<dataflow_frame> this_(this);
             parallel::executor_traits<Executor>::apply_execute(exec,
-                &dataflow_frame::done, std::move(this_));
+                &dataflow_frame::done, std::move(this_), std::move(futures));
         }
 #endif
 
@@ -334,13 +314,46 @@ namespace hpx { namespace lcos { namespace detail
             traits::is_one_way_executor<Executor>::value ||
             traits::is_two_way_executor<Executor>::value
         >::type
-        finalize(Executor& exec)
+        finalize(Executor& exec, Futures&& futures)
         {
+            using execute_function_type =
+                typename std::conditional<
+                    is_void_result::value,
+                    void (dataflow_frame::*)(std::true_type, Futures&&),
+                    void (dataflow_frame::*)(std::false_type, Futures&&)
+                >::type;
+
             execute_function_type f = &dataflow_frame::execute;
             boost::intrusive_ptr<dataflow_frame> this_(this);
 
             parallel::execution::post(exec,
-                f, std::move(this_), indices_type(), is_void());
+                f, std::move(this_), is_void_result{}, std::move(futures));
+        }
+
+    public:
+        /// Check whether the current future is ready
+        template <typename T>
+        auto operator()(util::async_traverse_visit_tag, T&& current)
+            -> decltype(async_visit_future(std::forward<T>(current)))
+        {
+            return async_visit_future(std::forward<T>(current));
+        }
+
+        /// Detach the current execution context and continue when the
+        /// current future was set to be ready.
+        template <typename T, typename N>
+        auto operator()(util::async_traverse_detach_tag, T&& current, N&& next)
+            -> decltype(async_detach_future(
+                std::forward<T>(current), std::forward<N>(next)))
+        {
+            return async_detach_future(
+                std::forward<T>(current), std::forward<N>(next));
+        }
+
+        /// Finish the dataflow when the traversal has finished
+        void operator()(util::async_traverse_complete_tag, Futures futures)
+        {
+            finalize(policy_, std::move(futures));
         }
 
     private:
@@ -385,21 +398,19 @@ namespace hpx { namespace lcos { namespace detail
                     >
                 >
                 frame_type;
-            typedef typename frame_type::init_no_addref init_no_addref;
 
-            boost::intrusive_ptr<frame_type> p(new frame_type(
-                    std::forward<Policy>(launch_policy)
-                  , Derived()
-                  , util::forward_as_tuple(
-                        id
-                      , traits::acquire_future_disp()(std::forward<Ts>(ts))...
-                    )
-                  , init_no_addref()
-                ), false);
-            p->do_await();
+            using construction_data = typename frame_type::construction_data ;
 
-            using traits::future_access;
-            return future_access<typename frame_type::type>::create(std::move(p));
+            construction_data data{
+                std::forward<Policy>(launch_policy), Derived{}};
+
+            boost::intrusive_ptr<frame_type> p = util::traverse_pack_async(
+                util::async_traverse_in_place_tag<frame_type>{},
+                std::move(data), id,
+                traits::acquire_future_disp()(std::forward<Ts>(ts))...);
+
+            return traits::future_access<typename frame_type::type>::create(
+                std::move(p));
         }
 
         template <
