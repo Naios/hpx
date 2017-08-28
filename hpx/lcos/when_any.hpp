@@ -133,6 +133,7 @@ namespace hpx
 #include <hpx/util/assert.hpp>
 #include <hpx/util/deferred_call.hpp>
 #include <hpx/util/detail/pack.hpp>
+#include <hpx/util/pack_traversal.hpp>
 #include <hpx/util/tuple.hpp>
 
 #include <boost/atomic.hpp>
@@ -216,11 +217,12 @@ namespace hpx { namespace lcos
             {}
 
             template <typename Future>
-            void operator()(Future& future,
-                typename std::enable_if<
-                    traits::is_future<Future>::value
-                >::type* = nullptr) const
+            void operator()(Future& future)
             {
+                static_assert(
+                    traits::is_future<typename std::decay<Future>::type>::value,
+                    "when_any doesn't allow non future values by design!");
+
                 std::size_t index =
                     when_.index_.load(boost::memory_order_seq_cst);
                 if (index == when_any_result<Sequence>::index_error())
@@ -261,52 +263,9 @@ namespace hpx { namespace lcos
                 ++idx_;
             }
 
-            template <typename Sequence_>
-            HPX_FORCEINLINE
-            void operator()(Sequence_& sequence,
-                typename std::enable_if<
-                    traits::is_future_range<Sequence_>::value
-                >::type* = nullptr) const
-            {
-                apply(sequence);
-            }
-
-            template <typename Tuple, std::size_t ...Is>
-            HPX_FORCEINLINE
-            void apply(Tuple& tuple, util::detail::pack_c<std::size_t, Is...>) const
-            {
-                int const _sequencer[]= {
-                    (((*this)(util::get<Is>(tuple))), 0)...
-                };
-                (void)_sequencer;
-            }
-
-            template <typename ...Ts>
-            HPX_FORCEINLINE
-            void apply(util::tuple<Ts...>& sequence) const
-            {
-                apply(sequence,
-                    typename util::detail::make_index_pack<sizeof...(Ts)>::type());
-            }
-
-            template <typename Sequence_>
-            HPX_FORCEINLINE
-            void apply(Sequence_& sequence) const
-            {
-                std::for_each(sequence.begin(), sequence.end(), *this);
-            }
-
             when_any<Sequence>& when_;
-            mutable std::size_t idx_;
+            std::size_t idx_;
         };
-
-        template <typename Sequence>
-        HPX_FORCEINLINE
-        void set_on_completed_callback(when_any<Sequence>& when)
-        {
-            set_when_any_callback_impl<Sequence> callback(when);
-            callback.apply(when.lazy_values_.futures);
-        }
 
         ///////////////////////////////////////////////////////////////////////
         template <typename Sequence>
@@ -332,6 +291,14 @@ namespace hpx { namespace lcos
             when_any();
             when_any(when_any const&);
 
+            HPX_FORCEINLINE
+            void set_on_completed_callbacks()
+            {
+                set_when_any_callback_impl<Sequence> callback(*this);
+                hpx::util::traverse_pack(
+                    std::move(callback), lazy_values_.futures);
+            }
+
         public:
             typedef Sequence argument_type;
 
@@ -344,7 +311,7 @@ namespace hpx { namespace lcos
             when_any_result<Sequence> operator()()
             {
                 // set callback functions to executed when future is ready
-                set_on_completed_callback(*this);
+                set_on_completed_callbacks();
 
                 // if one of the requested futures is already set, our
                 // callback above has already been called often enough, otherwise
